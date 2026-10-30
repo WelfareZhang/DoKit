@@ -6,21 +6,12 @@ import { buildCustomFragment, CustomFragmentRegistry } from '../core/CustomFragm
 import { DoKitPageStack } from '../core/DoKitPageStack';
 import { DoKitManager } from '../core/DoKitManager';
 import { ToolPanelDoKitView } from '../core/toolpanel/ToolPanelDoKitView';
-import { ColorPickManager } from '../kit/colorpick/ColorPickManager';
-import { ColorPickerDoKitView } from '../kit/colorpick/ColorPickerDoKitView';
-import { AlignRulerManager } from '../kit/alignruler/AlignRulerManager';
-import { AlignRulerDoKitView } from '../kit/alignruler/AlignRulerDoKitView';
-import { ViewCheckManager } from '../kit/viewcheck/ViewCheckManager';
-import { ViewCheckDoKitView } from '../kit/viewcheck/ViewCheckDoKitView';
-import { ViewCheckTree } from '../kit/viewcheck/ViewCheckTree';
-import { LayoutBorderManager } from '../kit/layoutborder/LayoutBorderManager';
-import { LayoutBorderDoKitView } from '../kit/layoutborder/LayoutBorderDoKitView';
 import { KitGroup } from '../model/KitModels';
 import { DOKIT_MODAL_TICK } from '../subwindow/DoKitSubWindowRoute';
 
 /**
- * 只放在模态窗里：面板、全屏栈、取色 / 标尺 / 控件检查 / 布局边框。
- * 球、自定义浮窗、性能条不在这里，避免全屏窗口挡住业务页。
+ * 全屏层：工具面板和全屏功能页。
+ * 取色、标尺、控件检查、布局边框在 DoKitOverlayHost 里单独挂。
  */
 @Component
 export struct DoKitLayerHost {
@@ -32,10 +23,6 @@ export struct DoKitLayerHost {
   @State private activeIsSystemFragment: boolean = false;
   @State private pageRevision: number = 0;
   @State private kitGroups: KitGroup[] = [];
-  @State private showColorPicker: boolean = false;
-  @State private showAlignRuler: boolean = false;
-  @State private showViewCheck: boolean = false;
-  @State private showLayoutBorder: boolean = false;
 
   @StorageLink(DOKIT_MODAL_TICK) @Watch('pull') modalTick: number = 0;
   @StorageProp('topRectHeight') private topRectHeightPx: number = 0;
@@ -51,10 +38,6 @@ export struct DoKitLayerHost {
     this.kitGroups = DoKitManager.getKitGroups();
     this.syncFullscreenFromStack();
     this.showPanel = DoKitViewManager.isPanelVisible() && !this.hasFullscreen;
-    this.showColorPicker = ColorPickManager.getInstance().isOverlayOpen();
-    this.showAlignRuler = AlignRulerManager.getInstance().isOverlayOpen();
-    this.showViewCheck = ViewCheckManager.getInstance().isOverlayOpen();
-    this.showLayoutBorder = LayoutBorderManager.getInstance().isOverlayOpen();
   }
 
   private syncFullscreenFromStack(): void {
@@ -135,27 +118,6 @@ export struct DoKitLayerHost {
   build() {
     Stack() {
       if (GlobalConfig.debugMode) {
-        if (!this.showPanel && !this.hasFullscreen && this.showColorPicker) {
-          ColorPickerDoKitView({
-            containerWidth: this.containerWidth,
-            containerHeight: this.containerHeight
-          })
-        }
-        if (!this.showPanel && !this.hasFullscreen && this.showAlignRuler) {
-          AlignRulerDoKitView({
-            containerWidth: this.containerWidth,
-            containerHeight: this.containerHeight
-          })
-        }
-        if (!this.showPanel && !this.hasFullscreen && this.showLayoutBorder) {
-          LayoutBorderDoKitView()
-        }
-        if (!this.showPanel && !this.hasFullscreen && this.showViewCheck) {
-          ViewCheckDoKitView({
-            containerWidth: this.containerWidth,
-            containerHeight: this.containerHeight
-          })
-        }
         if (this.showPanel && !this.hasFullscreen) {
           Column() {
             ToolPanelDoKitView({
@@ -176,7 +138,6 @@ export struct DoKitLayerHost {
         }
       }
     }
-    .id(ViewCheckTree.FLOATING_ID)
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Transparent)

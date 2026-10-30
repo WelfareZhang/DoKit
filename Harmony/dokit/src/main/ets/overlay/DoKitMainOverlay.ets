@@ -1,4 +1,5 @@
 import { ComponentContent, window } from '@kit.ArkUI';
+import { KeyCode } from '@kit.InputKit';
 import { DoKitViewManager } from '../core/DoKitViewManager';
 import { DoKitPageStack } from '../core/DoKitPageStack';
 import { SystemFragmentRegistry } from '../core/SystemFragmentRigistry';
@@ -15,6 +16,12 @@ import { LayoutBorderManager } from '../kit/layoutborder/LayoutBorderManager';
 import { DokitMemoryConfig } from '../config/DokitMemoryConfig';
 import { bindWindowStageToAppStorage } from '../subwindow/DoKitSubWindowUtil';
 import { DOKIT_MODAL_TICK } from '../subwindow/DoKitSubWindowRoute';
+import { ColorPickerDoKitView } from '../kit/colorpick/ColorPickerDoKitView';
+import { AlignRulerDoKitView } from '../kit/alignruler/AlignRulerDoKitView';
+import { ViewCheckDoKitView } from '../kit/viewcheck/ViewCheckDoKitView';
+import { ViewCheckTree } from '../kit/viewcheck/ViewCheckTree';
+import { LayoutBorderDoKitView } from '../kit/layoutborder/LayoutBorderDoKitView';
+import { DoKitBack } from './DoKitBack';
 
 const DOKIT_OVERLAY_TICK: string = 'dokitOverlayTick';
 const DOKIT_NAV_INSET_PX: string = 'dokitNavInsetPx';
@@ -30,6 +37,13 @@ export class DoKitMainOverlay {
   private static content: ComponentContent<Object> | null = null;
   private static shown: boolean = false;
   private static inSync: boolean = false;
+  private static pageWasOpen: boolean = false;
+  private static lastToolSig: string = '';
+  /** 全屏页打开期间才拉起的浮标，才画在全屏页上面 */
+  static colorDuringPage: boolean = false;
+  static rulerDuringPage: boolean = false;
+  static viewDuringPage: boolean = false;
+  static layoutDuringPage: boolean = false;
 
   static attach(stage: window.WindowStage): void {
     DoKitMainOverlay.stage = stage;
@@ -85,11 +99,45 @@ export class DoKitMainOverlay {
     }
   }
 
+  private static toolSignature(): string {
+    const color = ColorPickManager.getInstance().isOverlayOpen() ? '1' : '0';
+    const ruler = AlignRulerManager.getInstance().isOverlayOpen() ? '1' : '0';
+    const view = ViewCheckManager.getInstance().isOverlayOpen() ? '1' : '0';
+    const layout = LayoutBorderManager.getInstance().isOverlayOpen() ? '1' : '0';
+    return `${color}${ruler}${view}${layout}`;
+  }
+
   private static syncState(): void {
     if (DoKitMainOverlay.inSync) {
       return;
     }
     DoKitMainOverlay.inSync = true;
+    const page = !DoKitPageStack.isEmpty();
+    const sig = DoKitMainOverlay.toolSignature();
+    if (page && !DoKitMainOverlay.pageWasOpen) {
+      DoKitMainOverlay.colorDuringPage = false;
+      DoKitMainOverlay.rulerDuringPage = false;
+      DoKitMainOverlay.viewDuringPage = false;
+      DoKitMainOverlay.layoutDuringPage = false;
+      if (ColorPickManager.getInstance().isOverlayOpen()) {
+        ColorPickManager.getInstance().close();
+      }
+    } else if (page && sig !== DoKitMainOverlay.lastToolSig) {
+      DoKitMainOverlay.colorDuringPage = ColorPickManager.getInstance().isOverlayOpen();
+      DoKitMainOverlay.rulerDuringPage = AlignRulerManager.getInstance().isOverlayOpen();
+      DoKitMainOverlay.viewDuringPage = ViewCheckManager.getInstance().isOverlayOpen();
+      DoKitMainOverlay.layoutDuringPage = LayoutBorderManager.getInstance().isOverlayOpen();
+    } else if (!page && DoKitMainOverlay.pageWasOpen) {
+      DoKitMainOverlay.colorDuringPage = false;
+      DoKitMainOverlay.rulerDuringPage = false;
+      DoKitMainOverlay.viewDuringPage = false;
+      DoKitMainOverlay.layoutDuringPage = false;
+      if (ColorPickManager.getInstance().isOverlayOpen()) {
+        ColorPickManager.getInstance().close();
+      }
+    }
+    DoKitMainOverlay.pageWasOpen = !DoKitPageStack.isEmpty();
+    DoKitMainOverlay.lastToolSig = DoKitMainOverlay.toolSignature();
     if (!DoKitPageStack.isEmpty() && DoKitViewManager.isPanelVisible()) {
       DoKitViewManager.detachToolPanel();
     }
@@ -176,6 +224,11 @@ struct DoKitOverlayHost {
   @State private showRam: boolean = false;
   @State private showNetwork: boolean = false;
   @State private showBall: boolean = true;
+  @State private showColor: boolean = false;
+  @State private showRuler: boolean = false;
+  @State private showViewCheck: boolean = false;
+  @State private showLayout: boolean = false;
+  @State private needBack: boolean = false;
 
   aboutToAppear(): void {
     this.reload();
@@ -197,17 +250,28 @@ struct DoKitOverlayHost {
     this.floatNames = names;
     this.hasPage = !DoKitPageStack.isEmpty();
     const showPanel = DoKitViewManager.isPanelVisible() && !this.hasPage;
-    const showTool = ColorPickManager.getInstance().isOverlayOpen() ||
-      AlignRulerManager.getInstance().isOverlayOpen() ||
-      ViewCheckManager.getInstance().isOverlayOpen() ||
-      LayoutBorderManager.getInstance().isOverlayOpen();
-    this.showLayer = showPanel || this.hasPage || showTool;
+    this.showLayer = showPanel || this.hasPage;
     this.showFps = PerformanceDokitViewManager.isFpsOverlayOpen();
     this.showCpu = PerformanceDokitViewManager.isCpuOverlayOpen();
     this.showRam = PerformanceDokitViewManager.isRamOverlayOpen();
     this.showNetwork = PerformanceDokitViewManager.isNetworkOverlayOpen();
     this.showPerf = this.showFps || this.showCpu || this.showRam || this.showNetwork;
     this.showBall = DoKitOverlayState.isIconVisible() && !this.hasPage;
+    this.showColor = ColorPickManager.getInstance().isOverlayOpen() &&
+      (!this.hasPage || DoKitMainOverlay.colorDuringPage);
+    this.showRuler = AlignRulerManager.getInstance().isOverlayOpen() &&
+      (!this.hasPage || DoKitMainOverlay.rulerDuringPage);
+    this.showViewCheck = ViewCheckManager.getInstance().isOverlayOpen() &&
+      (!this.hasPage || DoKitMainOverlay.viewDuringPage);
+    this.showLayout = LayoutBorderManager.getInstance().isOverlayOpen() &&
+      (!this.hasPage || DoKitMainOverlay.layoutDuringPage);
+    this.needBack = this.hasPage || DoKitViewManager.isPanelVisible();
+    if (this.needBack) {
+      try {
+        focusControl.requestFocus(ViewCheckTree.FLOATING_ID);
+      } catch (_e) {
+      }
+    }
   }
 
   private topInsetVp(): number {
@@ -258,26 +322,55 @@ struct DoKitOverlayHost {
         if (this.showPerf) {
           this.PerfChart()
         }
-        if (this.showBall) {
-          DoKitOverlayBall({
-            stageW: this.stageW,
-            stageH: this.stageH,
-            topInset: this.topInsetVp(),
-            bottomInset: this.bottomInsetVp()
-          })
-        }
       }
       if (this.showLayer) {
         DoKitLayerHost()
       }
+      if (this.showLayout) {
+        LayoutBorderDoKitView()
+      }
+      if (this.showViewCheck) {
+        ViewCheckDoKitView({
+          containerWidth: this.stageW,
+          containerHeight: this.stageH
+        })
+      }
+      if (this.showRuler) {
+        AlignRulerDoKitView({
+          containerWidth: this.stageW,
+          containerHeight: this.stageH
+        })
+      }
+      if (this.showColor) {
+        ColorPickerDoKitView({
+          containerWidth: this.stageW,
+          containerHeight: this.stageH
+        })
+      }
       if (this.hasPage && this.showPerf) {
         this.PerfChart()
       }
+      if (this.showBall) {
+        DoKitOverlayBall({
+          stageW: this.stageW,
+          stageH: this.stageH,
+          topInset: this.topInsetVp(),
+          bottomInset: this.bottomInsetVp()
+        })
+      }
     }
+    .id(ViewCheckTree.FLOATING_ID)
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Transparent)
     .hitTestBehavior(HitTestMode.None)
+    .focusable(this.needBack)
+    .onKeyPreIme((event: KeyEvent): boolean => {
+      if (!this.needBack || event.type !== KeyType.Down || event.keyCode !== KeyCode.KEYCODE_BACK) {
+        return false;
+      }
+      return DoKitBack.consume();
+    })
     .onAreaChange((_oldValue: Area, area: Area) => {
       const width = Number(area.width);
       const height = Number(area.height);

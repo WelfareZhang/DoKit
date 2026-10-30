@@ -22,6 +22,10 @@ struct Index {
   @State menuSections: DemoMenuSection[] = getDemoMenuSections();
   @StorageLink(DoKitOverlayState.ICON_VISIBLE_KEY) isFloatIconShow: boolean = true;
 
+  onBackPress(): boolean {
+    return DoKit.consumeBackPress();
+  }
+
   private onItemClick(title: string): void {
     switch (title) {
       case '显示/隐藏快捷入口':

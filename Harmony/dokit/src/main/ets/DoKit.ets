@@ -17,6 +17,7 @@ import { DoKitLauncher } from './core/DoKitLauncher';
 import { DoKitOverlayState } from './model/DoKitOverlayState';
 import { CustomViewBuilder, CustomViewRegistry, DoKitParams } from './core/CustomViewRegistry';
 import { DoKitMainOverlay } from './overlay/DoKitMainOverlay';
+import { DoKitBack } from './overlay/DoKitBack';
 
 export { DoKitConstants } from './constant/DoKitConstants';
 
@@ -182,6 +183,14 @@ export class DoKit {
   /** Ability 销毁时卸下主窗口浮层 */
   static detach(): void {
     DoKitMainOverlay.detach();
+  }
+
+  /**
+   * 业务页 onBackPress 里调用。
+   * API 12 的浮层接不到系统返回手势，返回 true 表示 DoKit 已消费。
+   */
+  static consumeBackPress(): boolean {
+    return DoKitBack.consume();
   }
 
   static registerCustomKits(groupName: string, kits: AbstractKit[]) {
