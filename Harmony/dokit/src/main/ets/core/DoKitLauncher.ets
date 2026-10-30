@@ -22,6 +22,7 @@ export class DoKitLauncher {
     DoKitViewManager.detach(targetClass);
   }
 
+  /** 打开全屏工具根页（清栈） */
   static launchFullScreen(
     targetClass: string,
     bundle?: DoKitBundle,
@@ -30,7 +31,21 @@ export class DoKitLauncher {
     SystemFragmentRegistry.showContent(targetClass, bundle, isSystemFragment);
   }
 
+  /** 全屏内再打开下级页（压栈） */
+  static pushFullScreen(
+    targetClass: string,
+    bundle?: DoKitBundle,
+    isSystemFragment: boolean = false
+  ): void {
+    SystemFragmentRegistry.pushContent(targetClass, bundle, isSystemFragment);
+  }
+
   static finishFullScreen(): void {
     SystemFragmentRegistry.finish();
+  }
+
+  /** 全屏返回：有栈 pop，空则关闭 */
+  static popFullScreen(): void {
+    SystemFragmentRegistry.popOrFinish();
   }
 }

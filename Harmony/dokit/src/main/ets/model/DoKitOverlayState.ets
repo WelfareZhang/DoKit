@@ -4,6 +4,11 @@
 export class DoKitOverlayState {
   static readonly ICON_VISIBLE_KEY: string = 'dokit_icon_visible';
   static readonly PANEL_OPEN_KEY: string = 'dokit_panel_open';
+  private static iconListener: (() => void) | null = null;
+
+  static setIconListener(listener: (() => void) | null): void {
+    DoKitOverlayState.iconListener = listener;
+  }
 
   static init(defaultIconVisible: boolean = true): void {
     AppStorage.SetOrCreate<boolean>(DoKitOverlayState.ICON_VISIBLE_KEY, defaultIconVisible);
@@ -12,6 +17,9 @@ export class DoKitOverlayState {
 
   static setIconVisible(visible: boolean): void {
     AppStorage.Set<boolean>(DoKitOverlayState.ICON_VISIBLE_KEY, visible);
+    if (DoKitOverlayState.iconListener !== null) {
+      DoKitOverlayState.iconListener();
+    }
   }
 
   static isIconVisible(): boolean {

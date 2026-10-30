@@ -1,3 +1,9 @@
+/** 命名路由页 side-effect 注册，宿主 import @didi-hummer/dokit 即生效 */
+import './src/main/ets/subwindow/DoKitBallPage';
+import './src/main/ets/subwindow/DoKitFloatPage';
+import './src/main/ets/subwindow/DoKitPerfPage';
+import './src/main/ets/subwindow/DoKitModalPage';
+
 export { DoKit, DoKitBuilder } from './src/main/ets/DoKit';
 export { DoKitConstants } from './src/main/ets/constant/DoKitConstants';
 export { DoKitReal } from './src/main/ets/DoKitReal';
@@ -17,6 +23,11 @@ export { SystemKitRegistry as InnerKitRegistry } from './src/main/ets/core/Syste
 export { DoKitViewManager } from './src/main/ets/core/DoKitViewManager';
 export { DoKitBundle, FragmentCloseHandler, SystemFragmentBuilder } from './src/main/ets/core/FragmentRenderer';
 export { SystemFragmentRegistry as UniversalActivity, buildUniversalFragment } from './src/main/ets/core/SystemFragmentRigistry';
+export { CustomFragmentRegistry, buildCustomFragment } from './src/main/ets/core/CustomFragmentRegistry';
+export { DoKitPageStack, DoKitPageRecord } from './src/main/ets/core/DoKitPageStack';
+export { CustomViewBuilder, CustomViewRegistry, DoKitParams, CloseHandler } from './src/main/ets/core/CustomViewRegistry';
+export { DoKitSubWindow } from './src/main/ets/subwindow/DoKitSubWindow';
+export { DoKitLayerHost } from './src/main/ets/components/DoKitLayerHost';
 export { BaseFragment } from './src/main/ets/core/BaseFragment';
 export { AbsDoKitFragment } from './src/main/ets/core/AbsDoKitFragment';
 export { AbsDoKitView } from './src/main/ets/core/AbsDoKitView';

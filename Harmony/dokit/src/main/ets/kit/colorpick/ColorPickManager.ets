@@ -32,10 +32,10 @@ export class ColorPickManager {
       return;
     }
     this.restoreIcon = DoKitOverlayState.isIconVisible();
+    this.overlayOpen = true;
+    ColorPickConfig.setColorPickOpen(true);
     DoKitViewManager.detachToolPanel();
     DoKitViewManager.detachMainIcon();
-    ColorPickConfig.setColorPickOpen(true);
-    this.overlayOpen = true;
     this.notifyChange();
   }
 

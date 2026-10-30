@@ -29,9 +29,9 @@ export class LayoutBorderManager {
     if (this.overlayOpen) {
       return;
     }
-    DoKitViewManager.detachToolPanel();
-    LayoutBorderConfig.setLayoutBorderOpen(true);
     this.overlayOpen = true;
+    LayoutBorderConfig.setLayoutBorderOpen(true);
+    DoKitViewManager.detachToolPanel();
     this.notifyChange();
   }
 

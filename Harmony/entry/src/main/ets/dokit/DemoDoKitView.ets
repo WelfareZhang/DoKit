@@ -1,5 +1,4 @@
-import { CustomKitCloseHandler, DoKit, DoKitBundle } from '@didi-hummer/dokit';
-import { CloseHandler, DoKitParams } from '@didi-hummer/dokit/src/main/ets/core/CustomViewRegistry';
+import { CloseHandler, DoKitParams } from '@didi-hummer/dokit';
 
 
 /**

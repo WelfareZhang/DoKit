@@ -1,3 +1,4 @@
+import { DoKitChrome } from '../../subwindow/DoKitChrome';
 import { MultiCardiogramView } from './widget/MultiCardiogramView';
 
 class LegendItem {
@@ -24,6 +25,7 @@ export struct PerformanceDoKitView {
   @Prop showCpu: boolean = false;
   @Prop showRam: boolean = false;
   @Prop showNetwork: boolean = false;
+  @Prop windowMode: boolean = false;
   @Prop @Watch('onTopOffsetChange') topOffset: number = 88;
   @Prop containerHeight: number = 0;
   onClose: () => void = () => {};
@@ -46,6 +48,8 @@ export struct PerformanceDoKitView {
   /** 强制图例 Text 随数据刷新 */
   @State private legendEpoch: number = 0;
   private dragStartY: number = 0;
+  private perfDownY: number = 0;
+  private perfLimitY: number = 0;
 
   private getActiveCount(): number {
     let n = 0;
@@ -75,13 +79,17 @@ export struct PerformanceDoKitView {
   }
 
   aboutToAppear(): void {
+    if (this.windowMode) {
+      return;
+    }
     this.viewY = this.topOffset;
   }
 
   private onTopOffsetChange(): void {
-    if (!this.userDragged) {
-      this.viewY = this.topOffset;
+    if (this.windowMode || this.userDragged) {
+      return;
     }
+    this.viewY = this.topOffset;
   }
 
   private getMaxY(): number {
@@ -100,6 +108,33 @@ export struct PerformanceDoKitView {
       return max;
     }
     return value;
+  }
+
+  private onPerfWindowTouch(event: TouchEvent): void {
+    let point: TouchObject | undefined = undefined;
+    if (event.touches.length > 0) {
+      point = event.touches[0];
+    } else if (event.changedTouches.length > 0) {
+      point = event.changedTouches[0];
+    }
+    if (point === undefined) {
+      return;
+    }
+    if (event.type === TouchType.Down) {
+      this.dragStartY = DoKitChrome.perfTopVp();
+      this.perfDownY = point.displayY;
+      this.perfLimitY = Math.max(0, DoKitChrome.stageHeightVp() - this.getTotalHeight());
+      DoKitChrome.liftBall();
+      return;
+    }
+    if (event.type === TouchType.Move) {
+      const y = this.clamp(this.dragStartY + point.displayY - this.perfDownY, 0, this.perfLimitY);
+      DoKitChrome.movePerf(y);
+      return;
+    }
+    if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+      DoKitChrome.finishPerfDrag();
+    }
   }
 
   private onPanStart(): void {
@@ -176,7 +211,8 @@ export struct PerformanceDoKitView {
     .hitTestBehavior(HitTestMode.Default)
   }
 
-  build() {
+  @Builder
+  private ChartBody() {
     Column() {
       this.LegendRow()
       MultiCardiogramView({
@@ -203,19 +239,41 @@ export struct PerformanceDoKitView {
     .width('100%')
     .height(this.getTotalHeight())
     .backgroundColor('#AA000000')
-    .position({ x: 0, y: this.viewY })
-    .hitTestBehavior(HitTestMode.Default)
-    .gesture(
-      PanGesture({ direction: PanDirection.Vertical, fingers: 1, distance: 1 })
-        .onActionStart(() => {
-          this.onPanStart();
-        })
-        .onActionUpdate((event?: GestureEvent) => {
-          this.onPanMove(event);
-        })
-        .onActionEnd((event?: GestureEvent) => {
-          this.onPanEnd(event);
-        })
-    )
+    .onAreaChange((_oldValue: Area, area: Area) => {
+      if (!this.windowMode) {
+        return;
+      }
+      DoKitChrome.resizePerf(Number(area.height));
+    })
+  }
+
+  build() {
+    if (this.windowMode) {
+      Column() {
+        this.ChartBody()
+      }
+      .width('100%')
+      .onTouch((event: TouchEvent) => {
+        this.onPerfWindowTouch(event);
+      })
+    } else {
+      Column() {
+        this.ChartBody()
+      }
+      .position({ x: 0, y: this.viewY })
+      .hitTestBehavior(HitTestMode.Default)
+      .gesture(
+        PanGesture({ direction: PanDirection.Vertical, fingers: 1, distance: 1 })
+          .onActionStart(() => {
+            this.onPanStart();
+          })
+          .onActionUpdate((event?: GestureEvent) => {
+            this.onPanMove(event);
+          })
+          .onActionEnd((event?: GestureEvent) => {
+            this.onPanEnd(event);
+          })
+      )
+    }
   }
 }

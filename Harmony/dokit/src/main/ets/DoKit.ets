@@ -1,3 +1,4 @@
+import { hilog } from '@kit.PerformanceAnalysisKit';
 import { common } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { DokitThirdLibInfo } from './aop/DokitThirdLibInfo';
@@ -7,15 +8,17 @@ import { GlobalConfig } from './config/GlobalConfig';
 import { DoKitConstants } from './constant/DoKitConstants';
 import { WebDoorCallback } from './kit/webdoor/WebDoorCallback';
 import { AbstractKit } from './kit/AbstractKit';
-import { DEFAULT_BIZ_GROUP_NAME } from './kit/KitItemHelper';
 import { DoKitManager } from './core/DoKitManager';
 import { DoKitViewManager, ViewConfig } from './core/DoKitViewManager';
 import { DoKitBundle, SystemFragmentBuilder } from './core/FragmentRenderer';
 import { DoKitViewLaunchMode } from './core/DoKitIntent';
 import { SystemFragmentRegistry } from './core/SystemFragmentRigistry';
+import { CustomFragmentRegistry } from './core/CustomFragmentRegistry';
 import { DoKitLauncher } from './core/DoKitLauncher';
 import { DoKitOverlayState } from './model/DoKitOverlayState';
 import { CustomViewBuilder, CustomViewRegistry, DoKitParams } from './core/CustomViewRegistry';
+import { DoKitSubWindow } from './subwindow/DoKitSubWindow';
+import { DOKIT_MAX_FLOAT_WINDOWS } from './subwindow/DoKitSubWindowRoute';
 
 export { DoKitConstants } from './constant/DoKitConstants';
 
@@ -35,6 +38,7 @@ export class DoKitBuilder {
   private mH5BaseUrl: string = '';
   private mThirdLibInfos: Map<string, string> = new Map();
   private mThirdLibRawFile: string = '';
+  private mWindowStage: window.WindowStage | null = null;
 
   constructor(context: common.UIAbilityContext) {
     this.context = context;
@@ -50,18 +54,17 @@ export class DoKitBuilder {
     return this;
   }
 
-  /** @deprecated Overlay 方案不再需要 windowStage，保留仅为 API 兼容 */
-  windowStage(_stage: window.WindowStage): DoKitBuilder {
+  /** 绑定 WindowStage，build 时 attach SubWindow（需在 loadContent 后调用 DoKit.showOverlay） */
+  windowStage(stage: window.WindowStage): DoKitBuilder {
+    this.mWindowStage = stage;
     return this;
   }
 
-  /** 注入业务 Kit 分组，对标 Android customKits(mapKits) */
   customKits(kits: Map<string, AbstractKit[]>): DoKitBuilder {
     this.mCustomKits = kits;
     return this;
   }
 
-  /** 注入业务 Kit 列表，对标 Android customKits(listKits)，默认归入「业务专区」 */
   customKitList(kits: AbstractKit[]): DoKitBuilder {
     this.mCustomKitList = kits;
     return this;
@@ -97,25 +100,21 @@ export class DoKitBuilder {
     return this;
   }
 
-  /** H5任意门全局回调，对标 Android DoKit.Builder.webDoorCallback */
   webDoorCallback(callback: WebDoorCallback): DoKitBuilder {
     this.mWebDoorCallback = callback;
     return this;
   }
 
-  /** H5相对路径前缀，如 https://example.com */
   h5BaseUrl(url: string): DoKitBuilder {
     this.mH5BaseUrl = url;
     return this;
   }
 
-  /** 注入三方库信息，key 为库名（含版本），value 为体积字节数字符串 */
   thirdLibInfos(infos: Map<string, string>): DoKitBuilder {
     this.mThirdLibInfos = infos;
     return this;
   }
 
-  /** 从宿主 rawfile 加载三方库 JSON，对标 Android Gradle 插件编译期注入 */
   thirdLibRawFile(fileName: string): DoKitBuilder {
     this.mThirdLibRawFile = fileName;
     return this;
@@ -139,6 +138,9 @@ export class DoKitBuilder {
     }
     DoKitManager.setCallBack(this.mCallBack);
     DoKit.installInternal(this.context, this.mDebugMode, this.mCustomKits, this.mCustomKitList);
+    if (this.mDebugMode && this.mWindowStage !== null) {
+      DoKitSubWindow.attach(this.mWindowStage);
+    }
   }
 }
 
@@ -150,9 +152,12 @@ export class DoKit {
     return new DoKitBuilder(context);
   }
 
-  /** @deprecated 请使用 DoKit.Builder(context).build()，并在页面 Stack 中挂载 DoKitFloatingWindow */
+  /** @deprecated 请使用 DoKit.Builder(context).windowStage(stage).build() + DoKit.showOverlay() */
   static install(context: common.UIAbilityContext, _windowStage?: window.WindowStage): void {
     DoKit.installInternal(context, true, new Map(), []);
+    if (_windowStage !== undefined) {
+      DoKitSubWindow.attach(_windowStage);
+    }
   }
 
   static installInternal(
@@ -168,17 +173,24 @@ export class DoKit {
     DoKitOverlayState.init(GlobalConfig.alwaysShowMainIcon);
   }
 
-  /**
-   * 注册业务专区 kits
-   *
-   * @param groupName
-   * @param kits
-   */
+  /** 主窗 loadContent 成功后展示控件小窗；面板和全屏工具打开时再拉模态窗 */
+  static showOverlay(): void {
+    if (!GlobalConfig.debugMode) {
+      return;
+    }
+    DoKitSubWindow.show();
+  }
+
+  /** Ability 销毁时释放 SubWindow */
+  static detach(): void {
+    DoKitSubWindow.detach();
+  }
+
   static registerCustomKits(groupName: string, kits: AbstractKit[]) {
     DoKitManager.addCustomKits(groupName, kits);
   }
 
-  /** 启动悬浮窗，对标 Android DoKit.launchFloating(Class, mode, bundle) */
+  /** 启动类名悬浮（旧通道）；业务扩展请优先 launchFloatingView */
   static launchFloating(
     targetName: string,
     mode: DoKitViewLaunchMode = DoKitViewLaunchMode.SINGLE_INSTANCE,
@@ -187,31 +199,34 @@ export class DoKit {
     DoKitLauncher.launchFloating(targetName, mode, bundle);
   }
 
+  /** 自定义浮窗：可多实例并存、可拖动；Idle 下与悬浮球共存且球在最上 */
   static launchFloatingView(
     targetName: string,
     builder: CustomViewBuilder,
     params?: DoKitParams
   ): void {
-    CustomViewRegistry.registerBuilder(targetName,builder);
-
+    if (DoKitViewManager.getViewConfigByName(targetName) === undefined &&
+      DoKitViewManager.getViewConfigList().length >= DOKIT_MAX_FLOAT_WINDOWS) {
+      hilog.error(0xD0F1, 'DoKit', '自定义浮窗已达 %{public}d 个，忽略 %{public}s', DOKIT_MAX_FLOAT_WINDOWS, targetName);
+      return;
+    }
+    CustomViewRegistry.registerBuilder(targetName, builder);
+    DoKitViewManager.detachView(targetName);
     const config = new ViewConfig(targetName, true, params, { x: 20, y: 200 }, () => {
       DoKitViewManager.detachView(targetName);
     });
-
     DoKitViewManager.attachView(targetName, config);
-
   }
 
-  static removeFloatingView(targetName: string){
-    DoKitViewManager.detachView(targetName)
+  static removeFloatingView(targetName: string): void {
+    DoKitViewManager.detachView(targetName);
   }
 
-  /** 移除悬浮窗，对标 Android DoKit.removeFloating(Class) */
   static removeFloating(targetClass: string): void {
     DoKitLauncher.removeFloating(targetClass);
   }
 
-  /** 启动全屏页，对标 Android DoKit.launchFullScreen(Class, context, bundle, isSystemFragment) */
+  /** 打开全屏工具根页（清栈） */
   static launchFullScreen(
     targetClass: string,
     bundle?: DoKitBundle,
@@ -220,13 +235,30 @@ export class DoKit {
     DoKitLauncher.launchFullScreen(targetClass, bundle, isSystemFragment);
   }
 
-  /** 注册系统 Fragment，对标扩展 UniversalActivity 映射 */
+  /** 全屏内打开下级页（压栈，支持 A→B→回 A） */
+  static pushFullScreen(
+    targetClass: string,
+    bundle?: DoKitBundle,
+    isSystemFragment: boolean = false
+  ): void {
+    DoKitLauncher.pushFullScreen(targetClass, bundle, isSystemFragment);
+  }
+
   static registerSystemFragment(fragmentClass: string, builder: SystemFragmentBuilder): void {
     SystemFragmentRegistry.registerSystemFragment(fragmentClass, builder);
   }
 
+  /** 注册宿主自定义全屏页 Builder */
+  static registerCustomFragment(fragmentClass: string, builder: SystemFragmentBuilder): void {
+    CustomFragmentRegistry.register(fragmentClass, builder);
+  }
+
   static closeFullScreen(): void {
     DoKitLauncher.finishFullScreen();
+  }
+
+  static popFullScreen(): void {
+    DoKitLauncher.popFullScreen();
   }
 
   static show(): void {

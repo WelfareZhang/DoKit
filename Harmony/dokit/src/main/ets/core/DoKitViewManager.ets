@@ -38,6 +38,7 @@ export class DoKitViewManager {
   private static floatingAttachHandler: ((intent: DoKitIntent) => void) | null = null;
   private static floatingDetachHandler: (() => void) | null = null;
   private static windowRefreshHandler: (() => void) | null = null;
+  private static panelVisible: boolean = false;
   private static viewMap: Map<string, ViewConfig> = new Map()
 
   static setToolPanelChangeHandler(handler: ((visible: boolean) => void) | null): void {
@@ -70,7 +71,16 @@ export class DoKitViewManager {
     DoKitOverlayState.setIconVisible(false);
   }
 
+  static isPanelVisible(): boolean {
+    return DoKitViewManager.panelVisible;
+  }
+
+  static getViewConfigByName(name: string): ViewConfig | undefined {
+    return DoKitViewManager.viewMap.get(name);
+  }
+
   static attachToolPanel(): void {
+    DoKitViewManager.panelVisible = true;
     DoKitOverlayState.requestOpenPanel();
     if (DoKitViewManager.toolPanelChangeHandler !== null) {
       DoKitViewManager.toolPanelChangeHandler(true);
@@ -78,6 +88,11 @@ export class DoKitViewManager {
   }
 
   static detachToolPanel(): void {
+    if (!DoKitViewManager.panelVisible) {
+      return;
+    }
+    DoKitViewManager.panelVisible = false;
+    DoKitOverlayState.clearPanelOpenRequest();
     if (DoKitViewManager.toolPanelChangeHandler !== null) {
       DoKitViewManager.toolPanelChangeHandler(false);
     }
@@ -104,6 +119,14 @@ export class DoKitViewManager {
       list.push(config);
     });
     return list;
+  }
+
+  static updateViewPoint(name: string, x: number, y: number): void {
+    const config = DoKitViewManager.viewMap.get(name);
+    if (config === undefined) {
+      return;
+    }
+    config.viewPoint = { x: x, y: y };
   }
 
   /** 对标 Android DoKitViewManager.attach(DoKitIntent) */

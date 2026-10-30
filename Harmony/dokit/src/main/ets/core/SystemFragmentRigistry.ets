@@ -1,6 +1,7 @@
 import { BundleKey } from '../constant/BundleKey';
 import { FragmentIndex } from '../constant/FragmentIndex';
 import { DoKitBundle, FragmentCloseHandler, SystemFragmentBuilder } from './FragmentRenderer';
+import { DoKitPageRecord, DoKitPageStack } from './DoKitPageStack';
 import { SysInfoFragment, renderSysInfoFragment } from '../kit/sysinfo/SysInfoPage';
 import { WebDoorFragment, renderWebDoorFragment } from '../kit/webdoor/WebDoorPage';
 import { WebDoorDefaultFragment, renderWebDoorDefaultFragment } from '../kit/webdoor/WebDoorWebViewPage';
@@ -20,13 +21,11 @@ import {
 
 /**
  * 全屏工具页容器，对标 Android kit/core/UniversalActivity
+ * 内部使用 DoKitPageStack 支持 A→B→返回 A
  */
 export class SystemFragmentRegistry {
   private static readonly fragments: Map<string, SystemFragmentBuilder> = new Map();
-  private static fragmentName: string = '';
   private static initialized: boolean = false;
-  private static isSystemFragment: boolean = false;
-  private static bundle: DoKitBundle = {};
   private static openHandler: ((fragmentName: string, isSystemFragment: boolean) => void) | null = null;
   private static closeHandler: (() => void) | null = null;
 
@@ -49,7 +48,6 @@ export class SystemFragmentRegistry {
       wrapBuilder(renderBlockMonitorFragment));
     SystemFragmentRegistry.registerSystemFragment(PerformanceMonitorFragmentMeta.CLASS_NAME,
       wrapBuilder(renderPerformanceMonitorFragment));
-    // 旧独立页仍注册，兼容历史跳转；四个 Kit 入口已统一到 PerformanceMonitorFragment
     SystemFragmentRegistry.registerSystemFragment(FrameInfoFragmentMeta.CLASS_NAME,
       wrapBuilder(renderFrameInfoFragment));
     SystemFragmentRegistry.registerSystemFragment(CpuMainPageFragmentMeta.CLASS_NAME,
@@ -81,16 +79,77 @@ export class SystemFragmentRegistry {
     SystemFragmentRegistry.closeHandler = handler;
   }
 
+  /** 打开工具根页：清栈再 push */
   static showContent(fragmentName: string, bundle?: DoKitBundle, isSystemFragment: boolean = false): void {
-    SystemFragmentRegistry.fragmentName = fragmentName;
-    SystemFragmentRegistry.bundle = bundle ?? {};
-    SystemFragmentRegistry.isSystemFragment = isSystemFragment;
-    SystemFragmentRegistry.bundle[BundleKey.FRAGMENT_INDEX] = isSystemFragment ?
-      FragmentIndex.FRAGMENT_SYSTEM : FragmentIndex.FRAGMENT_CUSTOM;
-    SystemFragmentRegistry.bundle[isSystemFragment ? BundleKey.SYSTEM_FRAGMENT_CLASS :
-      BundleKey.CUSTOM_FRAGMENT_CLASS] = fragmentName;
+    const pageBundle = SystemFragmentRegistry.buildBundle(fragmentName, bundle, isSystemFragment);
+    DoKitPageStack.open(new DoKitPageRecord(fragmentName, pageBundle, isSystemFragment));
+    SystemFragmentRegistry.notifyOpen();
+  }
+
+  /** 全屏内下级页：压栈 */
+  static pushContent(fragmentName: string, bundle?: DoKitBundle, isSystemFragment: boolean = false): void {
+    const pageBundle = SystemFragmentRegistry.buildBundle(fragmentName, bundle, isSystemFragment);
+    DoKitPageStack.push(new DoKitPageRecord(fragmentName, pageBundle, isSystemFragment));
+    SystemFragmentRegistry.notifyOpen();
+  }
+
+  /** 返回上一页；栈空则关闭全屏 */
+  static popOrFinish(): void {
+    if (DoKitPageStack.isEmpty()) {
+      SystemFragmentRegistry.finish();
+      return;
+    }
+    const stillHas = DoKitPageStack.pop();
+    if (!stillHas) {
+      SystemFragmentRegistry.finish();
+      return;
+    }
+    SystemFragmentRegistry.notifyOpen();
+  }
+
+  static finish(): void {
+    DoKitPageStack.clear();
+    if (SystemFragmentRegistry.closeHandler !== null) {
+      SystemFragmentRegistry.closeHandler();
+    }
+  }
+
+  static getFragmentName(): string {
+    return DoKitPageStack.peek()?.name ?? '';
+  }
+
+  static getBundle(): DoKitBundle {
+    return DoKitPageStack.peek()?.bundle ?? {};
+  }
+
+  static isSystemFragmentActive(): boolean {
+    return DoKitPageStack.peek()?.isSystem ?? false;
+  }
+
+  static hasActiveFragment(): boolean {
+    return !DoKitPageStack.isEmpty();
+  }
+
+  static clearContent(): void {
+    DoKitPageStack.clear();
+  }
+
+  private static buildBundle(fragmentName: string, bundle: DoKitBundle | undefined,
+    isSystemFragment: boolean): DoKitBundle {
+    const pageBundle: DoKitBundle = bundle ?? {};
+    pageBundle[BundleKey.FRAGMENT_INDEX] =
+      isSystemFragment ? FragmentIndex.FRAGMENT_SYSTEM : FragmentIndex.FRAGMENT_CUSTOM;
+    pageBundle[isSystemFragment ? BundleKey.SYSTEM_FRAGMENT_CLASS : BundleKey.CUSTOM_FRAGMENT_CLASS] = fragmentName;
+    return pageBundle;
+  }
+
+  private static notifyOpen(): void {
+    const top = DoKitPageStack.peek();
+    if (top === undefined) {
+      return;
+    }
     if (SystemFragmentRegistry.openHandler !== null) {
-      SystemFragmentRegistry.openHandler(fragmentName, isSystemFragment);
+      SystemFragmentRegistry.openHandler(top.name, top.isSystem);
     }
   }
 
@@ -110,35 +169,6 @@ export class SystemFragmentRegistry {
       default:
         return '';
     }
-  }
-
-  static finish(): void {
-    SystemFragmentRegistry.clearContent();
-    if (SystemFragmentRegistry.closeHandler !== null) {
-      SystemFragmentRegistry.closeHandler();
-    }
-  }
-
-  static getFragmentName(): string {
-    return SystemFragmentRegistry.fragmentName;
-  }
-
-  static getBundle(): DoKitBundle {
-    return SystemFragmentRegistry.bundle;
-  }
-
-  static isSystemFragmentActive(): boolean {
-    return SystemFragmentRegistry.isSystemFragment;
-  }
-
-  static hasActiveFragment(): boolean {
-    return SystemFragmentRegistry.fragmentName.length > 0;
-  }
-
-  static clearContent(): void {
-    SystemFragmentRegistry.fragmentName = '';
-    SystemFragmentRegistry.bundle = {};
-    SystemFragmentRegistry.isSystemFragment = false;
   }
 }
 

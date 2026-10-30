@@ -34,7 +34,8 @@ export function buildCustomDokitFragment(bundle: DoKitBundle, onClose: CustomKit
       ViewSetupHelper({
         showFullScreenLauncher: true,
         onLaunchFullScreen: () => {
-          DoKit.launchFullScreen(CustomDokitFragment.CLASS_NAME, { "test": 'test' });
+          // 页内下级：压栈，返回可回到当前页
+          DoKit.pushFullScreen(CustomDokitFragment.CLASS_NAME, { 'test': 'nested' });
         }
       })
     }

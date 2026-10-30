@@ -11,6 +11,7 @@ import { PerformanceDoKitView } from '../kit/performance/PerformanceDoKitView';
 import { FpsFrameCollector } from '../kit/performance/FpsFrameCollector';
 import { DataSourceFactory } from '../kit/performance/datasource/DataSourceFactory';
 import { DoKitOverlayState } from '../model/DoKitOverlayState';
+import { DoKitChrome } from '../subwindow/DoKitChrome';
 import { KitGroup } from '../model/KitModels';
 import { DoKitBundle } from '../core/FragmentRenderer';
 import { ViewConfigDoKitView } from '../core/ViewConfigDoKitView';
@@ -31,8 +32,9 @@ function defaultCustomFullScreenPage(_fragmentClass: string, _bundle: DoKitBundl
 }
 
 /**
- * DoKit Overlay 根容器，对标 Android DoKitFrameLayout + DoKitViewManager 挂载点
- * 宿主：Stack() { 业务页; DoKitFloatingWindow() }
+ * @deprecated 请使用 Ability 级 SubWindow + DoKitLayerHost（DoKit.Builder.windowStage + showOverlay）。
+ * 本组件暂留工程，Demo 已不再挂载；页面内 Overlay 兼容可继续使用。
+ * 宿主旧用法：Stack() { 业务页; DoKitFloatingWindow() }
  */
 @Component
 export struct DoKitFloatingWindow {
@@ -69,8 +71,13 @@ export struct DoKitFloatingWindow {
   @StorageLink(DoKitOverlayState.PANEL_OPEN_KEY) @Watch('onPanelOpenRequest') panelOpenRequest: boolean = false;
   /** 壳 EntryAbility 写入的状态栏高度（px）；用 StorageProp 才能跟着避让区变化刷新 */
   @StorageProp('topRectHeight') private topRectHeightPx: number = 0;
+  private ownsHandlers: boolean = false;
 
   aboutToAppear(): void {
+    if (DoKitChrome.isActive()) {
+      return;
+    }
+    this.ownsHandlers = true;
     DoKitViewManager.setToolPanelChangeHandler((visible: boolean) => {
       if (visible) {
         this.kitGroups = DoKitManager.getKitGroups();
@@ -124,6 +131,10 @@ export struct DoKitFloatingWindow {
   }
 
   aboutToDisappear(): void {
+    if (!this.ownsHandlers || DoKitChrome.isActive()) {
+      return;
+    }
+    this.ownsHandlers = false;
     DoKitViewManager.setToolPanelChangeHandler(null);
     SystemFragmentRegistry.setOpenHandler(null);
     SystemFragmentRegistry.setCloseHandler(null);

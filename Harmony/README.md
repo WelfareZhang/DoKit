@@ -51,35 +51,42 @@ Harmony/
 
 DevEco Studio 打开 `Harmony/` → Sync → 运行 `entry` 模块。
 
-## 接入方式（Overlay 方案）
+## 接入方式（单 SubWindow 方案）
 
-对标 harmonydriver，不再使用 SubWindow，而是在宿主页面根 `Stack` 叠加 `DoKitFloatingWindow`：
+业务页**不必**再挂 `DoKitFloatingWindow`。在主 Ability 绑定 `WindowStage`，主窗 `loadContent` 成功后 `showOverlay`：
 
 ```typescript
-import { DoKit, DoKitFloatingWindow } from '@didi/dokit';
+import { DoKit } from '@didi-hummer/dokit';
 
-// 1. Ability 中初始化（无需 windowStage）
+// onWindowStageCreate
 DoKit.Builder(context)
+  .windowStage(windowStage)
   .productId('your_product_id')
   .debug(true)
   .build();
 
-// 2. 主页 Stack 叠加
-Stack() {
-  // 业务内容
-  YourMainPage()
+windowStage.loadContent('pages/Index', (err) => {
+  if (!err.code) {
+    DoKit.showOverlay();
+  }
+});
 
-  DoKitFloatingWindow()
-}
-.width('100%')
-.height('100%')
+// onWindowStageDestroy
+DoKit.detach();
 ```
+
+自定义全屏 / 浮窗：
+
+- `DoKit.registerCustomFragment(name, wrapBuilder(...))`
+- `DoKit.launchFloatingView(name, wrapBuilder(...))` — 可与悬浮球并存，球层级最高
+- `DoKit.launchFullScreen` / `DoKit.pushFullScreen` — 全屏根页 / 下级压栈
 
 API：
 
 - `DoKit.show()` / `DoKit.hide()` — 显示/隐藏悬浮球
-- `DoKit.showToolPanel()` — 远程打开工具面板
+- `DoKit.showToolPanel()` — 打开工具面板
 - `DoKit.isMainIconShow` — 悬浮球是否可见
+- `DoKitFloatingWindow` 暂留兼容，已 `@deprecated`
 
 ## 图片资源（对标 Android）
 
@@ -127,7 +134,7 @@ App.onCreate(context);
 | `DoKit.Builder(...).productId()` | 同 API |
 | `customKits(mapKits)` | `customKits(Map<string, AbstractKit[]>)` |
 | `MainDoKitActivity.kt` | `pages/Index.ets` |
-| SubWindow 悬浮球 | `DoKitFloatingWindow` Overlay |
+| 系统悬浮窗 / 页面 Overlay | 单 SubWindow + `DoKitLayerHost`（业务页零挂载） |
 | `AndroidManifest` 权限 | `module.json5` requestPermissions |
 
 ## entry 目录对照（对标 Android app/src/main/java/.../doraemondemo）

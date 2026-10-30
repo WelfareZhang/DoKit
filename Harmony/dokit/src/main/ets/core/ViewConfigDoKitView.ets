@@ -7,7 +7,7 @@ import { DoKitViewManager, ViewConfig } from './DoKitViewManager';
  */
 @Component
 export struct ViewConfigDoKitView {
-  @State config: ViewConfig = new ViewConfig('', false);
+  @Prop config: ViewConfig = new ViewConfig('', false);
   containerWidth: number = 0;
   containerHeight: number = 0;
 
@@ -60,11 +60,11 @@ export struct ViewConfigDoKitView {
   }
 
   private syncViewPoint(): void {
-    // 反向同步给config，避免下次渲染重置
     this.config.viewPoint = {
-      x:this.viewX,
-      y:this.viewY
-    }
+      x: this.viewX,
+      y: this.viewY
+    };
+    DoKitViewManager.updateViewPoint(this.config.name, this.viewX, this.viewY);
   }
 
   private onPanStart(): void {

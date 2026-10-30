@@ -29,9 +29,9 @@ export class ViewCheckManager {
     if (this.overlayOpen) {
       return;
     }
-    DoKitViewManager.detachToolPanel();
-    ViewCheckConfig.setViewCheckOpen(true);
     this.overlayOpen = true;
+    ViewCheckConfig.setViewCheckOpen(true);
+    DoKitViewManager.detachToolPanel();
     this.notifyChange();
   }
 

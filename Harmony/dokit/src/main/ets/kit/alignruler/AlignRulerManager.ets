@@ -30,9 +30,9 @@ export class AlignRulerManager {
     if (this.overlayOpen) {
       return;
     }
-    DoKitViewManager.detachToolPanel();
-    AlignRulerConfig.setAlignRulerOpen(true);
     this.overlayOpen = true;
+    AlignRulerConfig.setAlignRulerOpen(true);
+    DoKitViewManager.detachToolPanel();
     this.notifyChange();
   }
 
