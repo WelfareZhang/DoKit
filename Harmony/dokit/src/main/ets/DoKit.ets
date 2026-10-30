@@ -1,4 +1,3 @@
-import { hilog } from '@kit.PerformanceAnalysisKit';
 import { common } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { DokitThirdLibInfo } from './aop/DokitThirdLibInfo';
@@ -17,8 +16,7 @@ import { CustomFragmentRegistry } from './core/CustomFragmentRegistry';
 import { DoKitLauncher } from './core/DoKitLauncher';
 import { DoKitOverlayState } from './model/DoKitOverlayState';
 import { CustomViewBuilder, CustomViewRegistry, DoKitParams } from './core/CustomViewRegistry';
-import { DoKitSubWindow } from './subwindow/DoKitSubWindow';
-import { DOKIT_MAX_FLOAT_WINDOWS } from './subwindow/DoKitSubWindowRoute';
+import { DoKitMainOverlay } from './overlay/DoKitMainOverlay';
 
 export { DoKitConstants } from './constant/DoKitConstants';
 
@@ -139,7 +137,7 @@ export class DoKitBuilder {
     DoKitManager.setCallBack(this.mCallBack);
     DoKit.installInternal(this.context, this.mDebugMode, this.mCustomKits, this.mCustomKitList);
     if (this.mDebugMode && this.mWindowStage !== null) {
-      DoKitSubWindow.attach(this.mWindowStage);
+      DoKitMainOverlay.attach(this.mWindowStage);
     }
   }
 }
@@ -156,7 +154,7 @@ export class DoKit {
   static install(context: common.UIAbilityContext, _windowStage?: window.WindowStage): void {
     DoKit.installInternal(context, true, new Map(), []);
     if (_windowStage !== undefined) {
-      DoKitSubWindow.attach(_windowStage);
+      DoKitMainOverlay.attach(_windowStage);
     }
   }
 
@@ -173,17 +171,17 @@ export class DoKit {
     DoKitOverlayState.init(GlobalConfig.alwaysShowMainIcon);
   }
 
-  /** 主窗 loadContent 成功后展示控件小窗；面板和全屏工具打开时再拉模态窗 */
+  /** 主窗 loadContent 成功后，把 DoKit 挂到主窗口 OverlayManager */
   static showOverlay(): void {
     if (!GlobalConfig.debugMode) {
       return;
     }
-    DoKitSubWindow.show();
+    DoKitMainOverlay.show();
   }
 
-  /** Ability 销毁时释放 SubWindow */
+  /** Ability 销毁时卸下主窗口浮层 */
   static detach(): void {
-    DoKitSubWindow.detach();
+    DoKitMainOverlay.detach();
   }
 
   static registerCustomKits(groupName: string, kits: AbstractKit[]) {
@@ -199,17 +197,12 @@ export class DoKit {
     DoKitLauncher.launchFloating(targetName, mode, bundle);
   }
 
-  /** 自定义浮窗：可多实例并存、可拖动；Idle 下与悬浮球共存且球在最上 */
+  /** 自定义浮窗：同名只留一个，挂进主窗口浮层，和悬浮球共存 */
   static launchFloatingView(
     targetName: string,
     builder: CustomViewBuilder,
     params?: DoKitParams
   ): void {
-    if (DoKitViewManager.getViewConfigByName(targetName) === undefined &&
-      DoKitViewManager.getViewConfigList().length >= DOKIT_MAX_FLOAT_WINDOWS) {
-      hilog.error(0xD0F1, 'DoKit', '自定义浮窗已达 %{public}d 个，忽略 %{public}s', DOKIT_MAX_FLOAT_WINDOWS, targetName);
-      return;
-    }
     CustomViewRegistry.registerBuilder(targetName, builder);
     DoKitViewManager.detachView(targetName);
     const config = new ViewConfig(targetName, true, params, { x: 20, y: 200 }, () => {

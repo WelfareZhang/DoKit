@@ -13,6 +13,12 @@ export class ViewConfig {
   closeHandler?: Callback<void>;
   isFloat: boolean;
   viewPoint: Position;
+  /** 竖屏位置，对标 Android LastDoKitViewPosInfo.portraitPoint */
+  portraitX: number = 0;
+  portraitY: number = 0;
+  /** 横屏位置，对标 Android LastDoKitViewPosInfo.landscapePoint */
+  landscapeX: number = 0;
+  landscapeY: number = 0;
 
   constructor(
     name: string,
@@ -24,8 +30,25 @@ export class ViewConfig {
     this.name = name;
     this.isFloat = isFloat;
     this.params = params;
-    this.viewPoint = viewPoint ?? { x: 0, y: 0 }
+    this.viewPoint = viewPoint ?? { x: 0, y: 0 };
     this.closeHandler = closeHandler;
+    const x = ViewConfig.readLen(this.viewPoint.x ?? 0);
+    const y = ViewConfig.readLen(this.viewPoint.y ?? 0);
+    this.portraitX = x;
+    this.portraitY = y;
+    this.landscapeX = x;
+    this.landscapeY = y;
+  }
+
+  static readLen(value: Length): number {
+    if (typeof value === 'number') {
+      return value;
+    }
+    const parsed = Number(value);
+    if (Number.isNaN(parsed)) {
+      return 0;
+    }
+    return parsed;
   }
 }
 

@@ -180,7 +180,7 @@ export struct DoKitLayerHost {
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Transparent)
-    .hitTestBehavior(HitTestMode.Default)
+    .hitTestBehavior(HitTestMode.None)
     .onAreaChange((_oldValue: Area, newValue: Area) => {
       this.containerWidth = Number(newValue.width);
       this.containerHeight = Number(newValue.height);
