@@ -27,6 +27,6 @@ export class DemoKit extends AbstractKit {
 
     DoKit.registerCustomKits('业务专区-' + DemoKit.id++, kits)
     DoKit.launchFloatingView(DemoDoKitView.KIT_NAME,wrapBuilder(DemoDoKitViewBuilder));
-    return true;
+    return false;
   }
 }

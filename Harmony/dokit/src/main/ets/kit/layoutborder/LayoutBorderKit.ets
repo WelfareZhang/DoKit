@@ -1,7 +1,17 @@
 import { common } from '@kit.AbilityKit';
 import { LayoutBorderConfig } from '../../config/LayoutBorderConfig';
+import { CloseHandler, CustomViewBuilder, DoKitParams } from '../../core/CustomViewRegistry';
+import { DoKitFloatOptions, DoKitViewManager } from '../../core/DoKitViewManager';
 import { AbstractKit } from '../AbstractKit';
+import { LayoutBorderDoKitView } from './LayoutBorderDoKitView';
 import { LayoutBorderManager } from './LayoutBorderManager';
+
+@Builder
+function renderLayoutBorderFloat(_params: DoKitParams, _close: CloseHandler) {
+  LayoutBorderDoKitView()
+}
+
+const LAYOUT_BORDER_FLOAT: CustomViewBuilder = wrapBuilder(renderLayoutBorderFloat);
 
 /**
  * 布局边框 Kit，对标 Android LayoutBorderKit。
@@ -30,6 +40,12 @@ export class LayoutBorderKit extends AbstractKit {
 
   onClickWithReturn(_context: common.UIAbilityContext): boolean {
     LayoutBorderManager.getInstance().open();
+    DoKitViewManager.launchFloatingView(
+      LayoutBorderManager.FLOAT_NAME,
+      LAYOUT_BORDER_FLOAT,
+      undefined,
+      DoKitFloatOptions.underLayer()
+    );
     return true;
   }
 }

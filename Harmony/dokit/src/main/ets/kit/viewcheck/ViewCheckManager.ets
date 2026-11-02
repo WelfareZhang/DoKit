@@ -5,6 +5,7 @@ import { DoKitViewManager } from '../../core/DoKitViewManager';
  * 控件检查浮层开关，对标 Android ViewCheckerKit 拉起准星、描边、信息条。
  */
 export class ViewCheckManager {
+  static readonly FLOAT_NAME: string = 'dokit.view';
   private static instance: ViewCheckManager | null = null;
 
   private overlayOpen: boolean = false;
@@ -41,6 +42,7 @@ export class ViewCheckManager {
     }
     ViewCheckConfig.setViewCheckOpen(false);
     this.overlayOpen = false;
+    DoKitViewManager.detachView(ViewCheckManager.FLOAT_NAME);
     this.notifyChange();
   }
 

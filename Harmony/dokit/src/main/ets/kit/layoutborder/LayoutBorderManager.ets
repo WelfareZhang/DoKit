@@ -5,6 +5,7 @@ import { DoKitViewManager } from '../../core/DoKitViewManager';
  * 布局边框浮层开关，对标 Android LayoutBorderManager.start / stop。
  */
 export class LayoutBorderManager {
+  static readonly FLOAT_NAME: string = 'dokit.layout';
   private static instance: LayoutBorderManager | null = null;
 
   private overlayOpen: boolean = false;
@@ -41,6 +42,7 @@ export class LayoutBorderManager {
     }
     LayoutBorderConfig.setLayoutBorderOpen(false);
     this.overlayOpen = false;
+    DoKitViewManager.detachView(LayoutBorderManager.FLOAT_NAME);
     this.notifyChange();
   }
 

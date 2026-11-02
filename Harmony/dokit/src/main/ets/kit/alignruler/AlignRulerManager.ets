@@ -6,6 +6,7 @@ import { DoKitViewManager } from '../../core/DoKitViewManager';
  * 只关工具面板，主图标保持原样。
  */
 export class AlignRulerManager {
+  static readonly FLOAT_NAME: string = 'dokit.ruler';
   private static instance: AlignRulerManager | null = null;
 
   private overlayOpen: boolean = false;
@@ -42,6 +43,7 @@ export class AlignRulerManager {
     }
     AlignRulerConfig.setAlignRulerOpen(false);
     this.overlayOpen = false;
+    DoKitViewManager.detachView(AlignRulerManager.FLOAT_NAME);
     this.notifyChange();
   }
 

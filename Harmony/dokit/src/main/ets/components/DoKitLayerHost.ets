@@ -7,14 +7,16 @@ import { DoKitPageStack } from '../core/DoKitPageStack';
 import { DoKitManager } from '../core/DoKitManager';
 import { ToolPanelDoKitView } from '../core/toolpanel/ToolPanelDoKitView';
 import { KitGroup } from '../model/KitModels';
-import { DOKIT_MODAL_TICK } from '../subwindow/DoKitSubWindowRoute';
+import { DOKIT_MODAL_TICK, DOKIT_NAV_INSET_PX, DOKIT_TOP_RECT_HEIGHT, DOKIT_WINDOW_STAGE } from '../util/DoKitWindowUtil';
 
 /**
  * 全屏层：工具面板和全屏功能页。
- * 取色、标尺、控件检查、布局边框在 DoKitOverlayHost 里单独挂。
+ * 悬浮球和自定义浮窗不在这里画。
  */
 @Component
 export struct DoKitLayerHost {
+  /** page：全屏功能页。panel：工具面板。 */
+  @Prop role: string = 'page';
   @State private containerWidth: number = 0;
   @State private containerHeight: number = 0;
   @State private showPanel: boolean = false;
@@ -25,7 +27,8 @@ export struct DoKitLayerHost {
   @State private kitGroups: KitGroup[] = [];
 
   @StorageLink(DOKIT_MODAL_TICK) @Watch('pull') modalTick: number = 0;
-  @StorageProp('topRectHeight') private topRectHeightPx: number = 0;
+  @StorageProp(DOKIT_TOP_RECT_HEIGHT) private topRectHeightPx: number = 0;
+  @StorageProp(DOKIT_NAV_INSET_PX) private navInsetPx: number = 0;
 
   aboutToAppear(): void {
     this.pull();
@@ -65,12 +68,19 @@ export struct DoKitLayerHost {
     return this.topRectHeightPx > 0 ? px2vp(this.topRectHeightPx) : 0;
   }
 
+  private navInsetVp(): number {
+    if (this.navInsetPx <= 0) {
+      return 0;
+    }
+    return px2vp(this.navInsetPx);
+  }
+
   private shouldAvoidStatusBar(): boolean {
     if (this.topRectHeightPx > 0) {
       return true;
     }
     try {
-      const stage = AppStorage.get<window.WindowStage>('windowStage');
+      const stage = AppStorage.get<window.WindowStage>(DOKIT_WINDOW_STAGE);
       if (stage === undefined || stage === null) {
         return false;
       }
@@ -109,7 +119,7 @@ export struct DoKitLayerHost {
     }
     .width('100%')
     .height('100%')
-    .padding({ top: this.statusBarHeightVp() })
+    .padding({ top: this.statusBarHeightVp(), bottom: this.navInsetVp() })
     .backgroundColor(Color.White)
     .hitTestBehavior(HitTestMode.Default)
     .key(`dokit_fs_${this.activeFragmentClass}_${this.pageRevision}`)
@@ -118,7 +128,7 @@ export struct DoKitLayerHost {
   build() {
     Stack() {
       if (GlobalConfig.debugMode) {
-        if (this.showPanel && !this.hasFullscreen) {
+        if (this.role === 'panel' && this.showPanel && !this.hasFullscreen) {
           Column() {
             ToolPanelDoKitView({
               kitGroups: this.kitGroups,
@@ -129,11 +139,11 @@ export struct DoKitLayerHost {
           }
           .width('100%')
           .height('100%')
-          .padding({ top: this.statusBarHeightVp() })
+          .padding({ top: this.statusBarHeightVp(), bottom: this.navInsetVp() })
           .backgroundColor(Color.White)
           .hitTestBehavior(HitTestMode.Default)
         }
-        if (this.hasFullscreen && this.activeFragmentClass.length > 0) {
+        if (this.role === 'page' && this.hasFullscreen && this.activeFragmentClass.length > 0) {
           this.buildFullscreenContent()
         }
       }

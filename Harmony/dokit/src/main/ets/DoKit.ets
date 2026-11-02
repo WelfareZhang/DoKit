@@ -8,16 +8,16 @@ import { DoKitConstants } from './constant/DoKitConstants';
 import { WebDoorCallback } from './kit/webdoor/WebDoorCallback';
 import { AbstractKit } from './kit/AbstractKit';
 import { DoKitManager } from './core/DoKitManager';
-import { DoKitViewManager, ViewConfig } from './core/DoKitViewManager';
+import { DoKitFloatOptions, DoKitViewManager } from './core/DoKitViewManager';
 import { DoKitBundle, SystemFragmentBuilder } from './core/FragmentRenderer';
 import { DoKitViewLaunchMode } from './core/DoKitIntent';
 import { SystemFragmentRegistry } from './core/SystemFragmentRigistry';
 import { CustomFragmentRegistry } from './core/CustomFragmentRegistry';
 import { DoKitLauncher } from './core/DoKitLauncher';
 import { DoKitOverlayState } from './model/DoKitOverlayState';
-import { CustomViewBuilder, CustomViewRegistry, DoKitParams } from './core/CustomViewRegistry';
-import { DoKitMainOverlay } from './overlay/DoKitMainOverlay';
-import { DoKitBack } from './overlay/DoKitBack';
+import { CustomViewBuilder, DoKitParams } from './core/CustomViewRegistry';
+import { DoKitMainLayer } from './layer/DoKitMainLayer';
+import { DoKitBack } from './layer/DoKitBack';
 
 export { DoKitConstants } from './constant/DoKitConstants';
 
@@ -53,7 +53,7 @@ export class DoKitBuilder {
     return this;
   }
 
-  /** 绑定 WindowStage，build 时 attach SubWindow（需在 loadContent 后调用 DoKit.showOverlay） */
+  /** 绑定 WindowStage，build 后在 loadContent 成功时调用 DoKit.attach */
   windowStage(stage: window.WindowStage): DoKitBuilder {
     this.mWindowStage = stage;
     return this;
@@ -138,7 +138,7 @@ export class DoKitBuilder {
     DoKitManager.setCallBack(this.mCallBack);
     DoKit.installInternal(this.context, this.mDebugMode, this.mCustomKits, this.mCustomKitList);
     if (this.mDebugMode && this.mWindowStage !== null) {
-      DoKitMainOverlay.attach(this.mWindowStage);
+      DoKitMainLayer.attach(this.mWindowStage);
     }
   }
 }
@@ -151,11 +151,11 @@ export class DoKit {
     return new DoKitBuilder(context);
   }
 
-  /** @deprecated 请使用 DoKit.Builder(context).windowStage(stage).build() + DoKit.showOverlay() */
+  /** @deprecated 请使用 DoKit.Builder(context).windowStage(stage).build() + DoKit.attach() */
   static install(context: common.UIAbilityContext, _windowStage?: window.WindowStage): void {
     DoKit.installInternal(context, true, new Map(), []);
     if (_windowStage !== undefined) {
-      DoKitMainOverlay.attach(_windowStage);
+      DoKitMainLayer.attach(_windowStage);
     }
   }
 
@@ -172,17 +172,17 @@ export class DoKit {
     DoKitOverlayState.init(GlobalConfig.alwaysShowMainIcon);
   }
 
-  /** 主窗 loadContent 成功后，把 DoKit 挂到主窗口 OverlayManager */
-  static showOverlay(): void {
+  /** 主窗 loadContent 成功后，把 DoKit 挂到主窗口上。和 detach 成对。 */
+  static attach(): void {
     if (!GlobalConfig.debugMode) {
       return;
     }
-    DoKitMainOverlay.show();
+    DoKitMainLayer.show();
   }
 
   /** Ability 销毁时卸下主窗口浮层 */
   static detach(): void {
-    DoKitMainOverlay.detach();
+    DoKitMainLayer.detach();
   }
 
   /**
@@ -197,7 +197,10 @@ export class DoKit {
     DoKitManager.addCustomKits(groupName, kits);
   }
 
-  /** 启动类名悬浮（旧通道）；业务扩展请优先 launchFloatingView */
+  /**
+   * 按名字打开浮标。名字需要先通过 launchFloatingView 注册过 Builder，才会画出来。
+   * 业务扩展请直接用 launchFloatingView。
+   */
   static launchFloating(
     targetName: string,
     mode: DoKitViewLaunchMode = DoKitViewLaunchMode.SINGLE_INSTANCE,
@@ -206,18 +209,14 @@ export class DoKit {
     DoKitLauncher.launchFloating(targetName, mode, bundle);
   }
 
-  /** 自定义浮窗：同名只留一个，挂进主窗口浮层，和悬浮球共存 */
+  /** 自定义浮窗：同名只留一个。已在时只更新画法和摆放，不先卸再挂。 */
   static launchFloatingView(
     targetName: string,
     builder: CustomViewBuilder,
-    params?: DoKitParams
+    params?: DoKitParams,
+    options?: DoKitFloatOptions
   ): void {
-    CustomViewRegistry.registerBuilder(targetName, builder);
-    DoKitViewManager.detachView(targetName);
-    const config = new ViewConfig(targetName, true, params, { x: 20, y: 200 }, () => {
-      DoKitViewManager.detachView(targetName);
-    });
-    DoKitViewManager.attachView(targetName, config);
+    DoKitViewManager.launchFloatingView(targetName, builder, params, options);
   }
 
   static removeFloatingView(targetName: string): void {

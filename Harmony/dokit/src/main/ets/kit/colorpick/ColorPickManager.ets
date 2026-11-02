@@ -1,16 +1,26 @@
 import { ColorPickConfig } from '../../config/ColorPickConfig';
 import { DoKitViewManager } from '../../core/DoKitViewManager';
+import { DoKitLayers } from '../../layer/DoKitLayers';
 import { DoKitOverlayState } from '../../model/DoKitOverlayState';
 
 /**
  * 取色器浮层管理，对标 Android ColorPickManager + 浮层开关
  */
 export class ColorPickManager {
+  static readonly FLOAT_NAME: string = 'dokit.color';
   private static instance: ColorPickManager | null = null;
 
   private overlayOpen: boolean = false;
   private restoreIcon: boolean = true;
   private overlayChangeHandler: (() => void) | null = null;
+
+  private constructor() {
+    DoKitLayers.addPageObserver((entered: boolean, left: boolean): void => {
+      if (entered || left) {
+        this.close();
+      }
+    });
+  }
 
   static getInstance(): ColorPickManager {
     if (ColorPickManager.instance === null) {
@@ -48,6 +58,7 @@ export class ColorPickManager {
     if (this.restoreIcon) {
       DoKitViewManager.attachMainIcon();
     }
+    DoKitViewManager.detachView(ColorPickManager.FLOAT_NAME);
     this.notifyChange();
   }
 

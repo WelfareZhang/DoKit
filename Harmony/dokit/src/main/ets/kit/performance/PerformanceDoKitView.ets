@@ -1,4 +1,3 @@
-import { DoKitChrome } from '../../subwindow/DoKitChrome';
 import { MultiCardiogramView } from './widget/MultiCardiogramView';
 
 class LegendItem {
@@ -25,7 +24,6 @@ export struct PerformanceDoKitView {
   @Prop showCpu: boolean = false;
   @Prop showRam: boolean = false;
   @Prop showNetwork: boolean = false;
-  @Prop windowMode: boolean = false;
   /** 对标 Android PerformanceDoKitView.canDrag()。主窗口浮层传 false。 */
   @Prop canDrag: boolean = true;
   @Prop @Watch('onTopOffsetChange') topOffset: number = 88;
@@ -50,8 +48,6 @@ export struct PerformanceDoKitView {
   /** 强制图例 Text 随数据刷新 */
   @State private legendEpoch: number = 0;
   private dragStartY: number = 0;
-  private perfDownY: number = 0;
-  private perfLimitY: number = 0;
 
   private getActiveCount(): number {
     let n = 0;
@@ -81,14 +77,11 @@ export struct PerformanceDoKitView {
   }
 
   aboutToAppear(): void {
-    if (this.windowMode) {
-      return;
-    }
     this.viewY = this.topOffset;
   }
 
   private onTopOffsetChange(): void {
-    if (this.windowMode || this.userDragged) {
+    if (this.userDragged) {
       return;
     }
     this.viewY = this.topOffset;
@@ -110,33 +103,6 @@ export struct PerformanceDoKitView {
       return max;
     }
     return value;
-  }
-
-  private onPerfWindowTouch(event: TouchEvent): void {
-    let point: TouchObject | undefined = undefined;
-    if (event.touches.length > 0) {
-      point = event.touches[0];
-    } else if (event.changedTouches.length > 0) {
-      point = event.changedTouches[0];
-    }
-    if (point === undefined) {
-      return;
-    }
-    if (event.type === TouchType.Down) {
-      this.dragStartY = DoKitChrome.perfTopVp();
-      this.perfDownY = point.displayY;
-      this.perfLimitY = Math.max(0, DoKitChrome.stageHeightVp() - this.getTotalHeight());
-      DoKitChrome.liftBall();
-      return;
-    }
-    if (event.type === TouchType.Move) {
-      const y = this.clamp(this.dragStartY + point.displayY - this.perfDownY, 0, this.perfLimitY);
-      DoKitChrome.movePerf(y);
-      return;
-    }
-    if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-      DoKitChrome.finishPerfDrag();
-    }
   }
 
   private onPanStart(): void {
@@ -245,12 +211,6 @@ export struct PerformanceDoKitView {
     .height(this.getTotalHeight())
     .backgroundColor('#AA000000')
     .hitTestBehavior(this.canDrag ? HitTestMode.Default : HitTestMode.None)
-    .onAreaChange((_oldValue: Area, area: Area) => {
-      if (!this.windowMode) {
-        return;
-      }
-      DoKitChrome.resizePerf(Number(area.height));
-    })
   }
 
   build() {
@@ -261,14 +221,6 @@ export struct PerformanceDoKitView {
       .width('100%')
       .position({ x: 0, y: this.topOffset })
       .hitTestBehavior(HitTestMode.None)
-    } else if (this.windowMode) {
-      Column() {
-        this.ChartBody()
-      }
-      .width('100%')
-      .onTouch((event: TouchEvent) => {
-        this.onPerfWindowTouch(event);
-      })
     } else {
       Column() {
         this.ChartBody()

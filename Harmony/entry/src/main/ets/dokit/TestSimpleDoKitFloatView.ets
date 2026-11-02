@@ -8,7 +8,7 @@ export class TestSimpleDoKitFloatView {
 }
 
 @Builder
-export function TestSimpleDoKitFloatViewBuilder(_params?: DoKitParams, handler?: CloseHandler) {
+export function TestSimpleDoKitFloatViewBuilder(_params: DoKitParams, handler: CloseHandler) {
   Column() {
     Row() {
       Text('TestSimpleDoKitFloatView')
@@ -19,11 +19,13 @@ export function TestSimpleDoKitFloatViewBuilder(_params?: DoKitParams, handler?:
       Text('✕')
         .fontSize(18)
         .fontColor('#666666')
-        .padding(8)
+        .width(40)
+        .height(40)
+        .textAlign(TextAlign.Center)
+        .hitTestBehavior(HitTestMode.Default)
+        .monopolizeEvents(true)
         .onClick(() => {
-          if (handler) {
-            handler();
-          }
+          handler();
         })
     }
     .width('100%')

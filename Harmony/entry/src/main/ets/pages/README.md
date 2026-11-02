@@ -64,7 +64,7 @@ DoKit.registerCustomKits('业务专区一', [new MyToolKit()]);
 
 ## 第四步：实现 UI（@Builder）并注册到 DoKit（SubWindow 方案）
 
-业务页无需再挂 `DoKitFloatingWindow`。在 Ability 里 `windowStage` + `showOverlay`，自定义能力分别注册：
+业务页无需再挂 `DoKitFloatingWindow`。在 Ability 里 `windowStage` + `attach`，自定义能力分别注册：
 
 ```typescript
 // 自定义全屏：Ability 初始化时注册一次

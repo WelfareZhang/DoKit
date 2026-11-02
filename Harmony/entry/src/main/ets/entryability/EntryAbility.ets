@@ -7,7 +7,7 @@ import { App } from '../App';
 const DOMAIN = 0x0000;
 const TAG = 'EntryAbility';
 
-/** 对标 Android Application 入口；SubWindow 在 Ability 挂载，业务页零侵入 */
+/** 对标 Android Application 入口。浮层挂在主窗口，业务页不放 DoKit 控件。 */
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     hilog.info(DOMAIN, TAG, 'DoKit Demo onCreate');
@@ -26,7 +26,7 @@ export default class EntryAbility extends UIAbility {
         hilog.error(DOMAIN, TAG, 'Failed to load Index. Cause: %{public}s', JSON.stringify(err));
         return;
       }
-      DoKit.showOverlay();
+      DoKit.attach();
     });
   }
 

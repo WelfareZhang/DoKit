@@ -53,7 +53,7 @@ DevEco Studio 打开 `Harmony/` → Sync → 运行 `entry` 模块。
 
 ## 接入方式（单 SubWindow 方案）
 
-业务页**不必**再挂 `DoKitFloatingWindow`。在主 Ability 绑定 `WindowStage`，主窗 `loadContent` 成功后 `showOverlay`：
+业务页**不必**再挂 `DoKitFloatingWindow`。在主 Ability 绑定 `WindowStage`，主窗 `loadContent` 成功后 `attach`：
 
 ```typescript
 import { DoKit } from '@didi-hummer/dokit';
@@ -67,7 +67,7 @@ DoKit.Builder(context)
 
 windowStage.loadContent('pages/Index', (err) => {
   if (!err.code) {
-    DoKit.showOverlay();
+    DoKit.attach();
   }
 });
 
