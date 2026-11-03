@@ -26,6 +26,8 @@ export class DoKitMainLayer {
   private static inSync: boolean = false;
   private static pageWasOpen: boolean = false;
   private static lastModalKey: string = '';
+  /** 当前全屏栈顶。变了才让全屏层重建，避免压栈后还画着旧页。 */
+  private static lastPageKey: string = '';
 
   /** 记下主窗口，并开始监听状态栏、导航栏避让。 */
   static attach(stage: window.WindowStage): void {
@@ -71,6 +73,7 @@ export class DoKitMainLayer {
     DoKitMainLayer.stage = undefined;
     DoKitMainLayer.pageWasOpen = false;
     DoKitMainLayer.lastModalKey = '';
+    DoKitMainLayer.lastPageKey = '';
   }
 
   /** 移除 OverlayManager 上的那一块内容，并解掉刷新回调。 */
@@ -112,6 +115,8 @@ export class DoKitMainLayer {
       if (page && DoKitViewManager.isPanelVisible()) {
         DoKitViewManager.detachToolPanel();
       }
+      // 先记下全屏层是不是本来就在。栈顶更换时要靠它决定要不要重建。
+      const hadPage = DoKitLayers.has(DoKitLayerName.PAGE);
       // 先卸掉不该出现的层，再挂上该出现的，避免新层插到即将卸掉的层下面
       if (!page) {
         DoKitLayers.detach(DoKitLayerName.PAGE);
@@ -132,11 +137,30 @@ export class DoKitMainLayer {
       if (!page && DoKitOverlayState.isIconVisible()) {
         DoKitLayers.ensure(DoKitLayerName.BALL, BALL_LAYER_BUILDER, false, false);
       }
+      // 栈顶换了但全屏层还在。版本不加的话界面不重建，打开 B 会看起来没反应。
+      DoKitMainLayer.syncPageLayer(page, hadPage);
       // 球、面板、全屏页之外的浮窗，按浮窗表对齐
       DoKitMainLayer.syncFloatLayers();
     });
     DoKitMainLayer.publishModal();
     DoKitMainLayer.inSync = false;
+  }
+
+  /**
+   * 全屏层还在、栈顶变了，就让这一层版本加一。
+   * 关掉最后一页会把整层卸掉，所以关闭看得到；只压栈不会增减层，必须在这里补一次重建。
+   */
+  private static syncPageLayer(pageOpen: boolean, hadPage: boolean): void {
+    if (!pageOpen) {
+      DoKitMainLayer.lastPageKey = '';
+      return;
+    }
+    const top = DoKitPageStack.peek();
+    const pageKey = top === undefined ? '' : `${top.name}|${DoKitPageStack.getRevision()}`;
+    if (hadPage && pageKey !== DoKitMainLayer.lastPageKey) {
+      DoKitLayers.touch(DoKitLayerName.PAGE);
+    }
+    DoKitMainLayer.lastPageKey = pageKey;
   }
 
   /** 浮窗表里有的挂上，没有的从层表去掉。球、面板、全屏页不动。 */
@@ -310,8 +334,8 @@ struct DoKitOverlayHost {
   @StorageLink(DOKIT_OVERLAY_TICK) @Watch('reload') tick: number = 0;
   @StorageProp(DOKIT_TOP_RECT_HEIGHT) topRectHeightPx: number = 0;
   @StorageProp(DOKIT_NAV_INSET_PX) navInsetPx: number = 0;
-  @State private lowerLayers: DoKitLayerSnap[] = [];
-  @State private upperLayers: DoKitLayerSnap[] = [];
+  /** 按叠放序号从小到大。后画的盖住先画的。 */
+  @State private layers: DoKitLayerSnap[] = [];
   @State private stageW: number = 0;
   @State private stageH: number = 0;
   @State private needBack: boolean = false;
@@ -322,12 +346,12 @@ struct DoKitOverlayHost {
     this.reload();
   }
 
-  /** 层表变了就重分上下两段。刚出现页面或面板时要一次焦点，用来接返回键。 */
+  /** 层表变了就按序号重画。刚出现页面或面板时要一次焦点，用来接返回键。 */
   reload(): void {
     if (this.tick < 0) {
       return;
     }
-    this.applyLayers(DoKitLayers.snapshot());
+    this.layers = DoKitLayers.snapshot();
     const need = DoKitLayers.has(DoKitLayerName.PAGE) || DoKitLayers.has(DoKitLayerName.PANEL);
     if (need && !this.backFocused) {
       try {
@@ -339,44 +363,6 @@ struct DoKitOverlayHost {
       this.backFocused = false;
     }
     this.needBack = need;
-  }
-
-  /** 页面或面板留在先画的一段。要盖住它们的层放进后画的一段。 */
-  private applyLayers(all: DoKitLayerSnap[]): void {
-    let pageOrder = -1;
-    let panelOrder = -1;
-    for (let i = 0; i < all.length; i++) {
-      const item = all[i];
-      if (item === undefined) {
-        continue;
-      }
-      if (item.name === DoKitLayerName.PAGE) {
-        pageOrder = item.order;
-      } else if (item.name === DoKitLayerName.PANEL) {
-        panelOrder = item.order;
-      }
-    }
-    const lower: DoKitLayerSnap[] = [];
-    const upper: DoKitLayerSnap[] = [];
-    for (let i = 0; i < all.length; i++) {
-      const item = all[i];
-      if (item === undefined) {
-        continue;
-      }
-      let above = false;
-      if (pageOrder >= 0) {
-        above = item.name !== DoKitLayerName.PAGE && (item.abovePage || item.order > pageOrder);
-      } else if (panelOrder >= 0) {
-        above = item.name !== DoKitLayerName.PANEL && (item.abovePanel || item.order > panelOrder);
-      }
-      if (above) {
-        upper.push(item);
-      } else {
-        lower.push(item);
-      }
-    }
-    this.lowerLayers = lower;
-    this.upperLayers = upper;
   }
 
   /** 状态栏高度，单位 vp。 */
@@ -413,15 +399,15 @@ struct DoKitOverlayHost {
     .hitTestBehavior(HitTestMode.Transparent)
   }
 
-  /** 先画下层再画上层。有全屏页或工具面板时接收返回键。 */
+  /**
+   * 按序号从下往上画。身份不含序号：只换叠放时不拆组件，性能曲线的点才能留住。
+   * 版本仍在身份里，全屏栈换页会重建。
+   */
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
-      ForEach(this.lowerLayers, (item: DoKitLayerSnap) => {
+      ForEach(this.layers, (item: DoKitLayerSnap) => {
         this.layerNode(item)
-      }, (item: DoKitLayerSnap) => `${item.name}#${item.revision}@${item.order}`)
-      ForEach(this.upperLayers, (item: DoKitLayerSnap) => {
-        this.layerNode(item)
-      }, (item: DoKitLayerSnap) => `${item.name}#${item.revision}@${item.order}`)
+      }, (item: DoKitLayerSnap) => `${item.name}#${item.revision}`)
     }
     .id(ViewCheckTree.FLOATING_ID)
     .width('100%')

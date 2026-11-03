@@ -28,7 +28,7 @@ export class DoKitFloatOptions {
     const options = new DoKitFloatOptions();
     options.draggable = false;
     options.abovePage = true;
-    options.abovePanel = false;
+    options.abovePanel = true;
     options.passThrough = true;
     return options;
   }

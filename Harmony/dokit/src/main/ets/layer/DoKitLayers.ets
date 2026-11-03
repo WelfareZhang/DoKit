@@ -99,6 +99,18 @@ export class DoKitLayers {
     DoKitLayers.items.push(item);
   }
 
+  /**
+   * 层还在，但里面的内容换了。版本加一，ForEach 才会拆掉这一层重画。
+   * 全屏栈只换栈顶时层不会增减，不调用这个的话界面一直停在旧页。
+   */
+  static touch(name: string): void {
+    const found = DoKitLayers.find(name);
+    if (found === undefined) {
+      return;
+    }
+    found.revision++;
+  }
+
   /** 按名字拿掉一层。没有这个名字则什么都不做。 */
   static detach(name: string): void {
     for (let i = 0; i < DoKitLayers.items.length; i++) {

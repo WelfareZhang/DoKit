@@ -8,6 +8,7 @@ import { DemoKit } from './dokit/DemoKit';
 import { TestSimpleDokitFloatViewKit } from './dokit/TestSimpleDokitFloatViewKit';
 import { TestSimpleDokitFragmentKit } from './dokit/TestSimpleDokitFragmentKit';
 import { CustomDokitFragment, buildCustomDokitFragment } from './dokit/CustomDokitFragment';
+import { MultiPageKit, registerMultiPageFragments } from './dokit/MultiPageKit';
 
 const DOMAIN = 0xD0F1;
 const TAG = 'App';
@@ -48,11 +49,13 @@ export class App {
       CustomDokitFragment.CLASS_NAME,
       wrapBuilder(buildCustomDokitFragment)
     );
+    registerMultiPageFragments();
 
     const zone1: AbstractKit[] = [
       new DemoKit(),
       new TestSimpleDokitFloatViewKit(),
-      new TestSimpleDokitFragmentKit()
+      new TestSimpleDokitFragmentKit(),
+      new MultiPageKit()
     ];
     const zone2: AbstractKit[] = [
       new DemoKit(),

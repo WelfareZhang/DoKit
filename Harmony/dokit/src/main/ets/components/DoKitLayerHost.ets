@@ -90,41 +90,6 @@ export struct DoKitLayerHost {
     }
   }
 
-  @Builder
-  private buildFullscreenContent() {
-    Column() {
-      if (this.activeIsSystemFragment) {
-        buildUniversalFragment(this.activeFragmentClass, SystemFragmentRegistry.getBundle(), () => {
-          this.onFullscreenClose();
-        });
-      } else if (CustomFragmentRegistry.has(this.activeFragmentClass)) {
-        buildCustomFragment(this.activeFragmentClass, SystemFragmentRegistry.getBundle(), () => {
-          this.onFullscreenClose();
-        });
-      } else {
-        Column() {
-          Text(`未注册全屏页: ${this.activeFragmentClass}`)
-            .fontSize(14)
-            .fontColor('#666666')
-            .margin(16)
-          Button('关闭')
-            .onClick(() => {
-              SystemFragmentRegistry.finish();
-            })
-        }
-        .width('100%')
-        .height('100%')
-        .justifyContent(FlexAlign.Center)
-      }
-    }
-    .width('100%')
-    .height('100%')
-    .padding({ top: this.statusBarHeightVp(), bottom: this.navInsetVp() })
-    .backgroundColor(Color.White)
-    .hitTestBehavior(HitTestMode.Default)
-    .key(`dokit_fs_${this.activeFragmentClass}_${this.pageRevision}`)
-  }
-
   build() {
     Stack() {
       if (GlobalConfig.debugMode) {
@@ -143,15 +108,47 @@ export struct DoKitLayerHost {
           .backgroundColor(Color.White)
           .hitTestBehavior(HitTestMode.Default)
         }
+        // 父 Stack 是 None。全屏内容必须像工具面板一样直接写在 build 里，
+        // 写进 @Builder 时点击到不了关闭和页内按钮。
         if (this.role === 'page' && this.hasFullscreen && this.activeFragmentClass.length > 0) {
-          this.buildFullscreenContent()
+          Column() {
+            if (this.activeIsSystemFragment) {
+              buildUniversalFragment(this.activeFragmentClass, SystemFragmentRegistry.getBundle(), () => {
+                this.onFullscreenClose();
+              });
+            } else if (CustomFragmentRegistry.has(this.activeFragmentClass)) {
+              buildCustomFragment(this.activeFragmentClass, SystemFragmentRegistry.getBundle(), () => {
+                this.onFullscreenClose();
+              });
+            } else {
+              Column() {
+                Text(`未注册全屏页: ${this.activeFragmentClass}`)
+                  .fontSize(14)
+                  .fontColor('#666666')
+                  .margin(16)
+                Button('关闭')
+                  .onClick(() => {
+                    SystemFragmentRegistry.finish();
+                  })
+              }
+              .width('100%')
+              .height('100%')
+              .justifyContent(FlexAlign.Center)
+            }
+          }
+          .width('100%')
+          .height('100%')
+          .padding({ top: this.statusBarHeightVp(), bottom: this.navInsetVp() })
+          .backgroundColor(Color.White)
+          .hitTestBehavior(HitTestMode.Default)
+          .key(`dokit_fs_${this.activeFragmentClass}_${this.pageRevision}`)
         }
       }
     }
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Transparent)
-    .hitTestBehavior(HitTestMode.None)
+    .hitTestBehavior(this.hasFullscreen || this.showPanel ? HitTestMode.Default : HitTestMode.None)
     .onAreaChange((_oldValue: Area, newValue: Area) => {
       this.containerWidth = Number(newValue.width);
       this.containerHeight = Number(newValue.height);
