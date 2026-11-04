@@ -16,7 +16,7 @@ import { CustomFragmentRegistry } from './core/CustomFragmentRegistry';
 import { DoKitLauncher } from './core/DoKitLauncher';
 import { DoKitOverlayState } from './model/DoKitOverlayState';
 import { CustomViewBuilder, DoKitParams } from './core/CustomViewRegistry';
-import { DoKitMainLayer } from './layer/DoKitMainLayer';
+import { DoKitMainOverlay } from './layer/DoKitMainOverlay';
 import { DoKitBack } from './layer/DoKitBack';
 
 export { DoKitConstants } from './constant/DoKitConstants';
@@ -138,7 +138,7 @@ export class DoKitBuilder {
     DoKitManager.setCallBack(this.mCallBack);
     DoKit.installInternal(this.context, this.mDebugMode, this.mCustomKits, this.mCustomKitList);
     if (this.mDebugMode && this.mWindowStage !== null) {
-      DoKitMainLayer.attach(this.mWindowStage);
+      DoKitMainOverlay.addRootComponent(this.mWindowStage);
     }
   }
 }
@@ -155,7 +155,7 @@ export class DoKit {
   static install(context: common.UIAbilityContext, _windowStage?: window.WindowStage): void {
     DoKit.installInternal(context, true, new Map(), []);
     if (_windowStage !== undefined) {
-      DoKitMainLayer.attach(_windowStage);
+      DoKitMainOverlay.addRootComponent(_windowStage);
     }
   }
 
@@ -173,16 +173,16 @@ export class DoKit {
   }
 
   /** 主窗 loadContent 成功后，把 DoKit 挂到主窗口上。和 detach 成对。 */
-  static attach(): void {
+  static addOverLayerRootComponent(): void {
     if (!GlobalConfig.debugMode) {
       return;
     }
-    DoKitMainLayer.show();
+    DoKitMainOverlay.addComponentContent();
   }
 
   /** Ability 销毁时卸下主窗口浮层 */
-  static detach(): void {
-    DoKitMainLayer.detach();
+  static removeOverLayerRootComponent(): void {
+    DoKitMainOverlay.removeRootComponent();
   }
 
   /**

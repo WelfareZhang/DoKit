@@ -26,12 +26,12 @@ export default class EntryAbility extends UIAbility {
         hilog.error(DOMAIN, TAG, 'Failed to load Index. Cause: %{public}s', JSON.stringify(err));
         return;
       }
-      DoKit.attach();
+      DoKit.addOverLayerRootComponent();
     });
   }
 
   onWindowStageDestroy(): void {
     hilog.info(DOMAIN, TAG, 'DoKit Demo onWindowStageDestroy');
-    DoKit.detach();
+    DoKit.removeOverLayerRootComponent();
   }
 }

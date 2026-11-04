@@ -1,6 +1,6 @@
 import { ColorPickConfig } from '../../config/ColorPickConfig';
 import { DoKitViewManager } from '../../core/DoKitViewManager';
-import { DoKitLayers } from '../../layer/DoKitLayers';
+import { DoKitLayerTable } from '../../layer/DoKitLayerTable';
 import { DoKitOverlayState } from '../../model/DoKitOverlayState';
 
 /**
@@ -15,7 +15,7 @@ export class ColorPickManager {
   private overlayChangeHandler: (() => void) | null = null;
 
   private constructor() {
-    DoKitLayers.addPageObserver((entered: boolean, left: boolean): void => {
+    DoKitLayerTable.addPageObserver((entered: boolean, left: boolean): void => {
       if (entered || left) {
         this.close();
       }

@@ -32,7 +32,7 @@ Harmony/
         ├── DoKitCallBack.ets           # 回调接口（对标根包 DoKitCallBack.kt）
         ├── constant/DoKitConstants.ets
         ├── aop/DokitThirdLibInfo.ets
-        ├── components/DoKitFloatingWindow.ets
+        ├── components/DoKitModalContent.ets
         ├── config/                     # GlobalConfig、KitIconResolver、KitDisplayMeta
         ├── kit/
         │   ├── IKit.ets                # 对标 IKit.kt
@@ -53,7 +53,7 @@ DevEco Studio 打开 `Harmony/` → Sync → 运行 `entry` 模块。
 
 ## 接入方式（单 SubWindow 方案）
 
-业务页**不必**再挂 `DoKitFloatingWindow`。在主 Ability 绑定 `WindowStage`，主窗 `loadContent` 成功后 `attach`：
+业务页不用放 DoKit 控件。在主 Ability 绑定 `WindowStage`，主窗 `loadContent` 成功后 `attach`：
 
 ```typescript
 import { DoKit } from '@didi-hummer/dokit';
@@ -86,7 +86,6 @@ API：
 - `DoKit.show()` / `DoKit.hide()` — 显示/隐藏悬浮球
 - `DoKit.showToolPanel()` — 打开工具面板
 - `DoKit.isMainIconShow` — 悬浮球是否可见
-- `DoKitFloatingWindow` 暂留兼容，已 `@deprecated`
 
 ## 图片资源（对标 Android）
 
@@ -134,7 +133,7 @@ App.onCreate(context);
 | `DoKit.Builder(...).productId()` | 同 API |
 | `customKits(mapKits)` | `customKits(Map<string, AbstractKit[]>)` |
 | `MainDoKitActivity.kt` | `pages/Index.ets` |
-| 系统悬浮窗 / 页面 Overlay | 单 SubWindow + `DoKitLayerHost`（业务页零挂载） |
+| 系统悬浮窗 / 页面 Overlay | 单 SubWindow + `DoKitModalContent`（业务页零挂载） |
 | `AndroidManifest` 权限 | `module.json5` requestPermissions |
 
 ## entry 目录对照（对标 Android app/src/main/java/.../doraemondemo）
@@ -159,4 +158,4 @@ App.onCreate(context);
 
 ## 后续开发
 
-在 `pages/Index.ets` 的 `onItemClick` 中按菜单项逐个接入；工具 Kit 在 `DoKitFloatingWindow` 面板点击后路由。
+在 `pages/Index.ets` 的 `onItemClick` 中按菜单项逐个接入；工具 Kit 在主窗口浮层的工具面板点击后路由。

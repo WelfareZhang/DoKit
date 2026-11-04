@@ -5,10 +5,10 @@ import { DoKitPageStack } from '../core/DoKitPageStack';
 import { SystemFragmentRegistry } from '../core/SystemFragmentRigistry';
 import { CloseHandler, CustomViewBuilder, CustomViewRegistry, DoKitParams } from '../core/CustomViewRegistry';
 import { DoKitOverlayState } from '../model/DoKitOverlayState';
-import { DoKitLayerHost } from '../components/DoKitLayerHost';
+import { DoKitModalContent } from '../components/DoKitModalContent';
 import { ViewCheckTree } from '../kit/viewcheck/ViewCheckTree';
 import { DoKitBack } from './DoKitBack';
-import { DoKitLayerBuilder, DoKitLayerName, DoKitLayerSnap, DoKitLayers } from './DoKitLayers';
+import { DoKitLayerBuilder, DoKitLayerName, DoKitLayerRecord, DoKitLayerTable } from './DoKitLayerTable';
 import { DOKIT_MODAL_TICK, DOKIT_NAV_INSET_PX, DOKIT_OVERLAY_TICK, DOKIT_TOP_RECT_HEIGHT, bindWindowStageToAppStorage, unbindWindowAvoidArea } from '../util/DoKitWindowUtil';
 
 const DOKIT_BALL_X: string = 'dokitBallX';
@@ -17,9 +17,9 @@ const DOKIT_BALL_LAND_X: string = 'dokitBallLandX';
 const DOKIT_BALL_LAND_Y: string = 'dokitBallLandY';
 
 /**
- * 主窗口浮层。容器里只按 DoKitLayers 的顺序画，后挂上的盖住先挂上的。
+ * 主窗口浮层。容器里只按 DoKitLayerTable 的顺序画，后挂上的盖住先挂上的。
  */
-export class DoKitMainLayer {
+export class DoKitMainOverlay {
   private static stage: window.WindowStage | undefined = undefined;
   private static content: ComponentContent<Object> | null = null;
   private static shown: boolean = false;
@@ -30,120 +30,120 @@ export class DoKitMainLayer {
   private static lastPageKey: string = '';
 
   /** 记下主窗口，并开始监听状态栏、导航栏避让。 */
-  static attach(stage: window.WindowStage): void {
-    DoKitMainLayer.stage = stage;
+  static addRootComponent(stage: window.WindowStage): void {
+    DoKitMainOverlay.stage = stage;
     bindWindowStageToAppStorage(stage);
   }
 
   /** 把浮层挂到主窗口的 OverlayManager。已经挂过、或还没有窗口时直接返回。 */
-  static show(): void {
-    const stage = DoKitMainLayer.stage;
-    if (DoKitMainLayer.shown || stage === undefined) {
+  static addComponentContent(): void {
+    const stage = DoKitMainOverlay.stage;
+    if (DoKitMainOverlay.shown || stage === undefined) {
       return;
     }
-    DoKitMainLayer.bindHandlers();
+    DoKitMainOverlay.bindHandlers();
     try {
       const uiContext = stage.getMainWindowSync().getUIContext();
-      DoKitMainLayer.content = new ComponentContent<Object>(uiContext, wrapBuilder(buildDoKitOverlayHost));
-      uiContext.getOverlayManager().addComponentContent(DoKitMainLayer.content);
-      DoKitMainLayer.shown = true;
-      DoKitMainLayer.syncFrame();
+      DoKitMainOverlay.content = new ComponentContent<Object>(uiContext, wrapBuilder(buildDoKitOverlayRoot));
+      uiContext.getOverlayManager().addComponentContent(DoKitMainOverlay.content);
+      DoKitMainOverlay.shown = true;
+      DoKitMainOverlay.syncFrame();
     } catch (_e) {
-      DoKitMainLayer.unbindHandlers();
-      DoKitMainLayer.content = null;
-      DoKitMainLayer.shown = false;
+      DoKitMainOverlay.unbindHandlers();
+      DoKitMainOverlay.content = null;
+      DoKitMainOverlay.shown = false;
     }
   }
 
   /** 浮层是否已经挂上。 */
   static isShown(): boolean {
-    return DoKitMainLayer.shown;
+    return DoKitMainOverlay.shown;
   }
 
   /** 从 OverlayManager 卸下浮层。窗口和层表还留着。 */
-  static hide(): void {
-    DoKitMainLayer.removeContent();
+  static removeComponentContent(): void {
+    DoKitMainOverlay.removeContent();
   }
 
   /** 卸下浮层，停止避让监听，并清空层表和窗口。 */
-  static detach(): void {
-    DoKitMainLayer.removeContent();
+  static removeRootComponent(): void {
+    DoKitMainOverlay.removeContent();
     unbindWindowAvoidArea();
-    DoKitLayers.clear();
-    DoKitMainLayer.stage = undefined;
-    DoKitMainLayer.pageWasOpen = false;
-    DoKitMainLayer.lastModalKey = '';
-    DoKitMainLayer.lastPageKey = '';
+    DoKitLayerTable.clear();
+    DoKitMainOverlay.stage = undefined;
+    DoKitMainOverlay.pageWasOpen = false;
+    DoKitMainOverlay.lastModalKey = '';
+    DoKitMainOverlay.lastPageKey = '';
   }
 
   /** 移除 OverlayManager 上的那一块内容，并解掉刷新回调。 */
   private static removeContent(): void {
-    DoKitMainLayer.unbindHandlers();
-    const stage = DoKitMainLayer.stage;
-    const content = DoKitMainLayer.content;
+    DoKitMainOverlay.unbindHandlers();
+    const stage = DoKitMainOverlay.stage;
+    const content = DoKitMainOverlay.content;
     if (stage !== undefined && content !== null) {
       try {
         stage.getMainWindowSync().getUIContext().getOverlayManager().removeComponentContent(content);
       } catch (_e) {
       }
     }
-    DoKitMainLayer.content = null;
-    DoKitMainLayer.shown = false;
+    DoKitMainOverlay.content = null;
+    DoKitMainOverlay.shown = false;
   }
 
   /** 按当前状态重排悬浮球、工具面板、全屏页和浮窗。重入时直接返回。 */
   private static syncFrame(): void {
-    if (DoKitMainLayer.inSync) {
+    if (DoKitMainOverlay.inSync) {
       return;
     }
-    DoKitMainLayer.inSync = true;
+    DoKitMainOverlay.inSync = true;
     // 页面栈里现在有没有全屏页
     const page = !DoKitPageStack.isEmpty();
     // 上次没有、这次有：全屏页刚打开
-    const entered = page && !DoKitMainLayer.pageWasOpen;
+    const entered = page && !DoKitMainOverlay.pageWasOpen;
     // 上次有、这次没有：全屏页刚关掉
-    const left = !page && DoKitMainLayer.pageWasOpen;
+    const left = !page && DoKitMainOverlay.pageWasOpen;
     // 记下这次的状态，下次才能看出是不是刚进出
-    DoKitMainLayer.pageWasOpen = page;
+    DoKitMainOverlay.pageWasOpen = page;
     // 连续改层表，结束时只提交一次
-    DoKitLayers.batch(() => {
+    DoKitLayerTable.batch(() => {
       // 只在刚打开或刚关掉全屏页时通知。取色器据此关掉自己
       if (entered || left) {
-        DoKitLayers.notifyPageEdge(entered, left);
+        DoKitLayerTable.notifyPageEdge(entered, left);
       }
       // 有全屏页时先关掉工具面板，两者不同时存在
       if (page && DoKitViewManager.isPanelVisible()) {
         DoKitViewManager.detachToolPanel();
       }
       // 先记下全屏层是不是本来就在。栈顶更换时要靠它决定要不要重建。
-      const hadPage = DoKitLayers.has(DoKitLayerName.PAGE);
+      const hadPage = DoKitLayerTable.has(DoKitLayerName.PAGE);
       // 先卸掉不该出现的层，再挂上该出现的，避免新层插到即将卸掉的层下面
       if (!page) {
-        DoKitLayers.detach(DoKitLayerName.PAGE);
+        DoKitLayerTable.detach(DoKitLayerName.PAGE);
       }
       if (page || !DoKitViewManager.isPanelVisible()) {
-        DoKitLayers.detach(DoKitLayerName.PANEL);
+        DoKitLayerTable.detach(DoKitLayerName.PANEL);
       }
       if (page || !DoKitOverlayState.isIconVisible()) {
-        DoKitLayers.detach(DoKitLayerName.BALL);
+        DoKitLayerTable.detach(DoKitLayerName.BALL);
       }
       // 有全屏页只挂页面。没有页面时，面板开着才挂面板
       if (page) {
-        DoKitLayers.ensure(DoKitLayerName.PAGE, PAGE_LAYER_BUILDER, false, false);
+        DoKitLayerTable.ensure(DoKitLayerName.PAGE, PAGE_LAYER_BUILDER, false, false);
       } else if (DoKitViewManager.isPanelVisible()) {
-        DoKitLayers.ensure(DoKitLayerName.PANEL, PANEL_LAYER_BUILDER, false, false);
+        DoKitLayerTable.ensure(DoKitLayerName.PANEL, PANEL_LAYER_BUILDER, false, false);
       }
       // 没有全屏页且悬浮球可见时才挂球
       if (!page && DoKitOverlayState.isIconVisible()) {
-        DoKitLayers.ensure(DoKitLayerName.BALL, BALL_LAYER_BUILDER, false, false);
+        DoKitLayerTable.ensure(DoKitLayerName.BALL, BALL_LAYER_BUILDER, false, false);
       }
       // 栈顶换了但全屏层还在。版本不加的话界面不重建，打开 B 会看起来没反应。
-      DoKitMainLayer.syncPageLayer(page, hadPage);
+      DoKitMainOverlay.syncPageLayer(page, hadPage);
       // 球、面板、全屏页之外的浮窗，按浮窗表对齐
-      DoKitMainLayer.syncFloatLayers();
+      DoKitMainOverlay.syncFloatLayers();
     });
-    DoKitMainLayer.publishModal();
-    DoKitMainLayer.inSync = false;
+    DoKitMainOverlay.publishModal();
+    DoKitMainOverlay.inSync = false;
   }
 
   /**
@@ -152,15 +152,15 @@ export class DoKitMainLayer {
    */
   private static syncPageLayer(pageOpen: boolean, hadPage: boolean): void {
     if (!pageOpen) {
-      DoKitMainLayer.lastPageKey = '';
+      DoKitMainOverlay.lastPageKey = '';
       return;
     }
     const top = DoKitPageStack.peek();
     const pageKey = top === undefined ? '' : `${top.name}|${DoKitPageStack.getRevision()}`;
-    if (hadPage && pageKey !== DoKitMainLayer.lastPageKey) {
-      DoKitLayers.touch(DoKitLayerName.PAGE);
+    if (hadPage && pageKey !== DoKitMainOverlay.lastPageKey) {
+      DoKitLayerTable.touch(DoKitLayerName.PAGE);
     }
-    DoKitMainLayer.lastPageKey = pageKey;
+    DoKitMainOverlay.lastPageKey = pageKey;
   }
 
   /** 浮窗表里有的挂上，没有的从层表去掉。球、面板、全屏页不动。 */
@@ -173,9 +173,9 @@ export class DoKitMainLayer {
         continue;
       }
       names.push(config.name);
-      DoKitLayers.ensure(config.name, FLOAT_LAYER_BUILDER, config.abovePage, config.abovePanel);
+      DoKitLayerTable.ensure(config.name, FLOAT_LAYER_BUILDER, config.abovePage, config.abovePanel);
     }
-    DoKitLayers.retainFloats(names);
+    DoKitLayerTable.retainFloats(names);
   }
 
   /** 全屏页或工具面板变了，才让 dokitModalTick 加一，驱动这两块重画。 */
@@ -184,10 +184,10 @@ export class DoKitMainLayer {
     const page = DoKitPageStack.peek();
     const pagePart = page === undefined ? '' : `${page.name}|${page.isSystem ? '1' : '0'}|${DoKitPageStack.getRevision()}`;
     const modalKey = `${pagePart}|${panel}`;
-    if (modalKey === DoKitMainLayer.lastModalKey) {
+    if (modalKey === DoKitMainOverlay.lastModalKey) {
       return;
     }
-    DoKitMainLayer.lastModalKey = modalKey;
+    DoKitMainOverlay.lastModalKey = modalKey;
     const modal = (AppStorage.get<number>(DOKIT_MODAL_TICK) ?? 0) + 1;
     AppStorage.setOrCreate(DOKIT_MODAL_TICK, modal);
   }
@@ -196,27 +196,27 @@ export class DoKitMainLayer {
   private static bindHandlers(): void {
     // 工具面板打开或关闭
     DoKitViewManager.setToolPanelChangeHandler((_visible: boolean) => {
-      DoKitMainLayer.syncFrame();
+      DoKitMainOverlay.syncFrame();
     });
     // 浮窗挂上、卸下，或同名浮窗更新了摆放说明
     DoKitViewManager.setWindowRefreshHandler(() => {
-      DoKitMainLayer.syncFrame();
+      DoKitMainOverlay.syncFrame();
     });
     // 全屏栈清栈、压栈或弹出
     DoKitPageStack.setChangeHandler(() => {
-      DoKitMainLayer.syncFrame();
+      DoKitMainOverlay.syncFrame();
     });
     // 系统全屏页打开
     SystemFragmentRegistry.setOpenHandler((_name: string, _system: boolean) => {
-      DoKitMainLayer.syncFrame();
+      DoKitMainOverlay.syncFrame();
     });
     // 系统全屏页关闭
     SystemFragmentRegistry.setCloseHandler(() => {
-      DoKitMainLayer.syncFrame();
+      DoKitMainOverlay.syncFrame();
     });
     // 悬浮球显示或隐藏
     DoKitOverlayState.setIconListener(() => {
-      DoKitMainLayer.syncFrame();
+      DoKitMainOverlay.syncFrame();
     });
   }
 
@@ -253,27 +253,26 @@ function renderEmptyLayer(_name: string, _stageW: number, _stageH: number, _top:
 
 const EMPTY_LAYER_BUILDER: DoKitLayerBuilder = wrapBuilder(renderEmptyLayer);
 
-/** 悬浮球这一层。 */
+/** 悬浮球这一层。宽高自己量，不从这里传入。 */
 @Builder
-function renderBallLayer(_name: string, stageW: number, stageH: number, top: number, bottom: number) {
-  DoKitOverlayBall({
-    stageW: stageW,
-    stageH: stageH,
-    topInset: top,
-    bottomInset: bottom
-  })
+function renderBallLayer(_name: string, _stageW: number, _stageH: number, _top: number, _bottom: number) {
+  // 命中写在组件上。只写在内部 Stack 时，组件自己仍是 Default，铺满后会挡住页面。
+  DoKitOverlayBall()
+    .width('100%')
+    .height('100%')
+    .hitTestBehavior(HitTestMode.Transparent)
 }
 
 /** 工具面板这一层。 */
 @Builder
 function renderPanelLayer(_name: string, _stageW: number, _stageH: number, _top: number, _bottom: number) {
-  DoKitLayerHost({ role: 'panel' })
+  DoKitModalContent({ role: 'panel' })
 }
 
 /** 全屏页这一层。 */
 @Builder
 function renderPageLayer(_name: string, _stageW: number, _stageH: number, _top: number, _bottom: number) {
-  DoKitLayerHost({ role: 'page' })
+  DoKitModalContent({ role: 'page' })
 }
 
 /** 一条浮窗。画法按名字从注册表里取。 */
@@ -305,10 +304,10 @@ const FLOAT_LAYER_BUILDER: DoKitLayerBuilder = wrapBuilder(renderFloatLayer);
 
 /** OverlayManager 上的根节点。透明命中写在这里，空白点击才能落到业务页。 */
 @Builder
-function buildDoKitOverlayHost() {
+function buildDoKitOverlayRoot() {
   // 命中模式必须写在 WrappedBuilder 的根节点上。写在内部 Stack 时，
   // 自定义组件自己仍是 Default，整屏挡住页面。
-  DoKitOverlayHost()
+  DoKitOverlayRoot()
     .width('100%')
     .height('100%')
     .hitTestBehavior(HitTestMode.Transparent)
@@ -330,12 +329,12 @@ struct DoKitLayerItem {
 }
 
 @Component
-struct DoKitOverlayHost {
+struct DoKitOverlayRoot {
   @StorageLink(DOKIT_OVERLAY_TICK) @Watch('reload') tick: number = 0;
   @StorageProp(DOKIT_TOP_RECT_HEIGHT) topRectHeightPx: number = 0;
   @StorageProp(DOKIT_NAV_INSET_PX) navInsetPx: number = 0;
   /** 按叠放序号从小到大。后画的盖住先画的。 */
-  @State private layers: DoKitLayerSnap[] = [];
+  @State private layers: DoKitLayerRecord[] = [];
   @State private stageW: number = 0;
   @State private stageH: number = 0;
   @State private needBack: boolean = false;
@@ -351,8 +350,8 @@ struct DoKitOverlayHost {
     if (this.tick < 0) {
       return;
     }
-    this.layers = DoKitLayers.snapshot();
-    const need = DoKitLayers.has(DoKitLayerName.PAGE) || DoKitLayers.has(DoKitLayerName.PANEL);
+    this.layers = DoKitLayerTable.copyByOrder();
+    const need = DoKitLayerTable.has(DoKitLayerName.PAGE) || DoKitLayerTable.has(DoKitLayerName.PANEL);
     if (need && !this.backFocused) {
       try {
         focusControl.requestFocus(ViewCheckTree.FLOATING_ID);
@@ -383,16 +382,31 @@ struct DoKitOverlayHost {
 
   /** 包一层铺满的透明容器，这一层的空白处不挡住业务页。 */
   @Builder
-  private layerNode(item: DoKitLayerSnap) {
+  private layerNode(item: DoKitLayerRecord) {
     Stack() {
-      DoKitLayerItem({
-        layerName: item.name,
-        stageW: this.stageW,
-        stageH: this.stageH,
-        topInset: this.topInsetVp(),
-        bottomInset: this.bottomInsetVp(),
-        layerBuilder: item.builder ?? EMPTY_LAYER_BUILDER
-      })
+      if (item.name === DoKitLayerName.BALL) {
+        // 球要铺满才能量到窗口。这一层本身点透，点击只留给球的图片。
+        DoKitLayerItem({
+          layerName: item.name,
+          stageW: this.stageW,
+          stageH: this.stageH,
+          topInset: this.topInsetVp(),
+          bottomInset: this.bottomInsetVp(),
+          layerBuilder: item.builder ?? EMPTY_LAYER_BUILDER
+        })
+          .width('100%')
+          .height('100%')
+          .hitTestBehavior(HitTestMode.Transparent)
+      } else {
+        DoKitLayerItem({
+          layerName: item.name,
+          stageW: this.stageW,
+          stageH: this.stageH,
+          topInset: this.topInsetVp(),
+          bottomInset: this.bottomInsetVp(),
+          layerBuilder: item.builder ?? EMPTY_LAYER_BUILDER
+        })
+      }
     }
     .width('100%')
     .height('100%')
@@ -405,9 +419,9 @@ struct DoKitOverlayHost {
    */
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
-      ForEach(this.layers, (item: DoKitLayerSnap) => {
+      ForEach(this.layers, (item: DoKitLayerRecord) => {
         this.layerNode(item)
-      }, (item: DoKitLayerSnap) => `${item.name}#${item.revision}`)
+      }, (item: DoKitLayerRecord) => `${item.name}#${item.revision}`)
     }
     .id(ViewCheckTree.FLOATING_ID)
     .width('100%')
@@ -440,13 +454,17 @@ struct DoKitOverlayBall {
   private readonly edgeMargin: number = 16;
   private readonly dragThreshold: number = 4;
   private readonly tapLimitMs: number = 1000;
-  @Prop @Watch('onFrameChange') stageW: number = 0;
-  @Prop @Watch('onFrameChange') stageH: number = 0;
-  @Prop topInset: number = 0;
-  @Prop bottomInset: number = 0;
+  /** 自己量到的窗口宽高，单位 vp。不从 @Builder 传入，避免参数不刷新时一直是 0。 */
+  private stageW: number = 0;
+  private stageH: number = 0;
+  /** 状态栏高度，单位 px。和宿主读的是同一份。 */
+  @StorageProp(DOKIT_TOP_RECT_HEIGHT) @Watch('onInsetChange') private topRectHeightPx: number = 0;
+  /** 导航栏高度，单位 px。 */
+  @StorageProp(DOKIT_NAV_INSET_PX) @Watch('onInsetChange') private navInsetPx: number = 0;
   @State private x: number = 0;
   @State private y: number = 0;
-  private placed: boolean = false;
+  /** 量到有效窗口后才显示，避免先在左上角闪一下。 */
+  @State private placed: boolean = false;
   private land: boolean = false;
   private downX: number = 0;
   private downY: number = 0;
@@ -455,14 +473,37 @@ struct DoKitOverlayBall {
   private downTime: number = 0;
   private dragMoved: boolean = false;
 
-  /** 出现时按窗口大小摆一次位置。 */
-  aboutToAppear(): void {
+  /** 宽高都超过球本身，才算能摆、能拖。过小的第一次测量不锁位置。 */
+  private frameReady(): boolean {
+    return this.stageW > this.ballSize && this.stageH > this.ballSize;
+  }
+
+  /** 布局量到新的宽高后再摆。还不够大就保持未摆放，等下一次。 */
+  private onArea(area: Area): void {
+    const width = Number(area.width);
+    const height = Number(area.height);
+    if (width <= 1 || height <= 1) {
+      return;
+    }
+    if (width === this.stageW && height === this.stageH) {
+      return;
+    }
+    this.stageW = width;
+    this.stageH = height;
     this.onFrameChange();
+  }
+
+  /** 状态栏或导航栏高度后到时，只把现有坐标收进新范围，不把球丢回右下角。 */
+  onInsetChange(): void {
+    if (!this.placed || !this.frameReady()) {
+      return;
+    }
+    this.clampIntoFrame(true);
   }
 
   /** 尺寸就绪后恢复位置。横竖屏切换时先存当前方向，再读另一个方向。 */
   private onFrameChange(): void {
-    if (this.stageW <= 1 || this.stageH <= 1) {
+    if (!this.frameReady()) {
       return;
     }
     const land = this.stageW > this.stageH;
@@ -470,25 +511,34 @@ struct DoKitOverlayBall {
       this.land = land;
       if (!this.restore(land)) {
         this.placeDefault();
+      } else {
+        this.clampIntoFrame(false);
       }
       this.placed = true;
       return;
     }
     if (land === this.land) {
+      this.clampIntoFrame(false);
       return;
     }
     this.write(this.land);
     this.land = land;
     if (!this.restore(land)) {
       this.placeDefault();
+    } else {
+      this.clampIntoFrame(false);
     }
   }
 
-  /** 读出这个方向上次放下的位置。没有存过则返回 false。 */
+  /** 读出这个方向上次放下的位置。没有存过，或是尺寸为 0 时写下的原点，则返回 false。 */
   private restore(land: boolean): boolean {
     const savedX = AppStorage.get<number>(land ? DOKIT_BALL_LAND_X : DOKIT_BALL_X);
     const savedY = AppStorage.get<number>(land ? DOKIT_BALL_LAND_Y : DOKIT_BALL_Y);
     if (savedX === undefined || savedY === undefined) {
+      return false;
+    }
+    // 拖动范围是 0 时松手会把 (0, 0) 存下来。那不是用户放下的位置。
+    if (savedX === 0 && savedY === 0) {
       return false;
     }
     this.x = savedX;
@@ -517,9 +567,25 @@ struct DoKitOverlayBall {
     return Math.min(Math.max(value, min), max);
   }
 
+  /** 状态栏高度，单位 vp。 */
+  private topInsetVp(): number {
+    if (this.topRectHeightPx <= 0) {
+      return 0;
+    }
+    return px2vp(this.topRectHeightPx);
+  }
+
+  /** 导航栏高度，单位 vp。 */
+  private bottomInsetVp(): number {
+    if (this.navInsetPx <= 0) {
+      return 0;
+    }
+    return px2vp(this.navInsetPx);
+  }
+
   /** 球的最上沿，停在状态栏下面。 */
   private minY(): number {
-    return Math.max(0, this.topInset);
+    return Math.max(0, this.topInsetVp());
   }
 
   /** 球的最右沿，给球本身留出宽度。 */
@@ -529,12 +595,26 @@ struct DoKitOverlayBall {
 
   /** 球的最下沿，避开导航栏。 */
   private maxY(): number {
-    return Math.max(this.minY(), this.stageH - this.ballSize - Math.max(0, this.bottomInset));
+    return Math.max(this.minY(), this.stageH - this.ballSize - Math.max(0, this.bottomInsetVp()));
+  }
+
+  /** 收到当前窗口里。坐标变了且需要记住时才写回。 */
+  private clampIntoFrame(save: boolean): void {
+    const x = this.clamp(this.x, 0, this.maxX());
+    const y = this.clamp(this.y, this.minY(), this.maxY());
+    if (x === this.x && y === this.y) {
+      return;
+    }
+    this.x = x;
+    this.y = y;
+    if (save) {
+      this.save();
+    }
   }
 
   /** 没有存过位置时，放在右下角并记住。 */
   private placeDefault(): void {
-    if (this.stageW <= 1 || this.stageH <= 1) {
+    if (!this.frameReady()) {
       return;
     }
     this.x = Math.max(0, this.maxX() - this.edgeMargin);
@@ -554,9 +634,12 @@ struct DoKitOverlayBall {
     return undefined;
   }
 
-  /** 移动超过 4vp 才算拖。松手后贴到左右边缘。短按打开工具面板。 */
+  /** 移动超过 4vp 才算拖。松手后贴到左右边缘。短按打开工具面板。窗口还没量到时不处理，避免把原点存下来。 */
   private onBallTouch(event: TouchEvent): void {
     this.onFrameChange();
+    if (!this.frameReady()) {
+      return;
+    }
     const point = this.pointOf(event);
     if (point === undefined) {
       return;
@@ -604,27 +687,34 @@ struct DoKitOverlayBall {
     }
   }
 
-  /** 悬浮球图片。只有图片这块接收点击。 */
+  /** 铺满后自己量宽高。空白点透，只有图片接收点击。 */
   build() {
-    Image($r('app.media.dk_doraemon'))
-      .width(this.ballSize)
-      .height(this.ballSize)
-      .objectFit(ImageFit.Contain)
-      .position({ x: this.x, y: this.y })
-      .hitTestBehavior(HitTestMode.Default)
-      .monopolizeEvents(true)
-      .onAppear(() => {
-        this.onFrameChange();
-      })
-      .onTouch((event: TouchEvent) => {
-        this.onBallTouch(event);
-      })
+    Stack({ alignContent: Alignment.TopStart }) {
+      Image($r('app.media.dk_doraemon'))
+        .width(this.ballSize)
+        .height(this.ballSize)
+        .objectFit(ImageFit.Contain)
+        .position({ x: this.x, y: this.y })
+        .visibility(this.placed ? Visibility.Visible : Visibility.None)
+        .hitTestBehavior(HitTestMode.Default)
+        .monopolizeEvents(true)
+        .onTouch((event: TouchEvent) => {
+          this.onBallTouch(event);
+        })
+    }
+    .width('100%')
+    .height('100%')
+    .hitTestBehavior(HitTestMode.Transparent)
+    .onAreaChange((_oldValue: Area, area: Area) => {
+      this.onArea(area);
+    })
   }
 }
 
 @Component
 struct DoKitOverlayFloat {
   private readonly dragThreshold: number = 4;
+  private readonly longPressMs: number = 500;
   @Prop name: string = '';
   contentBuilder: CustomViewBuilder = EMPTY_OVERLAY_FLOAT;
   @Prop @Watch('onFrameChange') stageW: number = 0;
@@ -806,21 +896,27 @@ struct DoKitOverlayFloat {
     .monopolizeEvents(true)
     .responseRegion(this.hitRegion())
     .parallelGesture(
-      PanGesture({ direction: PanDirection.All, fingers: 1, distance: this.dragThreshold })
-        .onActionStart(() => {
-          this.originX = this.x;
-          this.originY = this.y;
-        })
-        .onActionUpdate((event?: GestureEvent) => {
-          if (event === undefined) {
-            return;
-          }
-          this.x = this.clamp(this.originX + event.offsetX, 0, this.maxX());
-          this.y = this.clamp(this.originY + event.offsetY, this.minY(), this.maxY());
-        })
-        .onActionEnd(() => {
-          this.writeSaved(this.land);
-        })
+      GestureGroup(GestureMode.Exclusive,
+        LongPressGesture({ repeat: false, duration: this.longPressMs })
+          .onAction(() => {
+            this.onClose();
+          }),
+        PanGesture({ direction: PanDirection.All, fingers: 1, distance: this.dragThreshold })
+          .onActionStart(() => {
+            this.originX = this.x;
+            this.originY = this.y;
+          })
+          .onActionUpdate((event?: GestureEvent) => {
+            if (event === undefined) {
+              return;
+            }
+            this.x = this.clamp(this.originX + event.offsetX, 0, this.maxX());
+            this.y = this.clamp(this.originY + event.offsetY, this.minY(), this.maxY());
+          })
+          .onActionEnd(() => {
+            this.writeSaved(this.land);
+          })
+      )
     )
   }
 
@@ -834,6 +930,12 @@ struct DoKitOverlayFloat {
     .hitTestBehavior(HitTestMode.Default)
     .monopolizeEvents(true)
     .responseRegion(this.hitRegion())
+    .parallelGesture(
+      LongPressGesture({ repeat: false, duration: this.longPressMs })
+        .onAction(() => {
+          this.onClose();
+        })
+    )
   }
 
   /** 按浮窗说明选择铺满、可拖卡片或不拖卡片。 */

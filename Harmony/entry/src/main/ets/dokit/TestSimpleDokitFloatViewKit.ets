@@ -22,6 +22,6 @@ export class TestSimpleDokitFloatViewKit extends AbstractKit {
       TestSimpleDoKitFloatView.CLASS_NAME,
       wrapBuilder(TestSimpleDoKitFloatViewBuilder)
     );
-    return false;
+    return true;
   }
 }

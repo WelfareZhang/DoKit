@@ -20,7 +20,7 @@ export { SystemFragmentRegistry as UniversalActivity, buildUniversalFragment } f
 export { CustomFragmentRegistry, buildCustomFragment } from './src/main/ets/core/CustomFragmentRegistry';
 export { DoKitPageStack, DoKitPageRecord } from './src/main/ets/core/DoKitPageStack';
 export { CustomViewBuilder, CustomViewRegistry, DoKitParams, CloseHandler } from './src/main/ets/core/CustomViewRegistry';
-export { DoKitLayerHost } from './src/main/ets/components/DoKitLayerHost';
+export { DoKitModalContent } from './src/main/ets/components/DoKitModalContent';
 export { BaseFragment } from './src/main/ets/core/BaseFragment';
 export { AbsDoKitFragment } from './src/main/ets/core/AbsDoKitFragment';
 export { AbsDoKitView } from './src/main/ets/core/AbsDoKitView';
@@ -99,5 +99,4 @@ export { DoKitFileUtil } from './src/main/ets/util/DoKitFileUtil';
 export { DoKitCommUtil } from './src/main/ets/util/DoKitCommUtil';
 export { DokitThirdLibInfo } from './src/main/ets/aop/DokitThirdLibInfo';
 export { DoKitSystemUtil } from './src/main/ets/util/DoKitSystemUtil';
-export { DoKitFloatingWindow } from './src/main/ets/components/DoKitFloatingWindow';
 export { DoKitOverlayState } from './src/main/ets/model/DoKitOverlayState';

@@ -14,7 +14,7 @@ import { CrashTest } from '../module/CrashTest';
 import { MethodCostTest } from '../module/MethodCostTest';
 
 /**
- * Demo 主页：业务页不再挂 DoKitFloatingWindow，浮层挂在主窗口 OverlayManager 上
+ * Demo 主页：浮层挂在主窗口 OverlayManager 上
  */
 @Entry
 @Component
